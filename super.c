@@ -269,7 +269,9 @@ static struct super_block * ods2_fill_super(struct super_block *sb, void *data, 
 
 			ods2p->indexf = iget(sb, 1); /* read INDEXF.SYS. */
 
+#if 0
 			extend_map(((ODS2FH *)ods2p->indexf->u.generic_ip)->map); // gross hack
+#endif
 			
 			sb->s_root = d_alloc_root(iget(sb, 4)); /* this is 000000.DIR;1 */
 			

@@ -342,6 +342,7 @@ int	ods2_write_map(struct fh2def * fh2p,ODS2MAP * map) {
 	{}
 }
 
+#if 0
 extend_map(ODS2MAP *map, u32 vbn) {
 
 	int i;
@@ -358,6 +359,7 @@ extend_map(ODS2MAP *map, u32 vbn) {
  out:
 	map->s1[i].cnt+=10; // gross hack
 }
+#endif
 
 typedef unsigned short vmsword;
 
