@@ -577,6 +577,7 @@ unsigned insert_ent(struct inode * inode,unsigned eofblk,unsigned curblk,
         memset(newbuf,0,BLOCKSIZE);
         eofblk++;
 	inode->i_blocks++;
+	inode->i_size+=512;
 
         /* First find where the next record is... */
 
@@ -628,6 +629,7 @@ unsigned insert_ent(struct inode * inode,unsigned eofblk,unsigned curblk,
         } else {
         }
         if ((sts & 1) == 0) printk("Bad status %d\n",sts);
+	mark_buffer_dirty(bh);
     }
     /* After that we can just add the record or entry as appropriate... */
 
