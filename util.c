@@ -29,7 +29,7 @@
 
 u64 div64(u64 a, u32 b0) {
 	u32 a1, a2;
-	u32 long res;
+	u32 res; // check. was long
 	
 	a1 = ((u32 *)&a)[0];
 	a2 = ((u32 *)&a)[1];
@@ -60,11 +60,11 @@ u32 ino2fhlbn(struct super_block *sb, u32 ino) {
 	ODS2SB			   *ods2p = (ODS2SB *)sb->u.generic_sbp;
 	
 	if (ino < 17) { /* the first 16 file headers are located at known locations in INDEXF.SYS */
-		return le16_to_cpu(ods2p->hm2.hm2_w_ibmapsize) + le32_to_cpu(ods2p->hm2.hm2_l_ibmaplbn) + ino - 1;
+		return le16_to_cpu(ods2p->hm2->hm2_w_ibmapsize) + le32_to_cpu(ods2p->hm2->hm2_l_ibmaplbn) + ino - 1;
 	} else {
 		ODS2FH		   *ods2fhp = (ODS2FH *)ods2p->indexf->u.generic_ip;
 		
-		return vbn2lbn(sb, ods2fhp->map, le16_to_cpu(ods2p->hm2.hm2_w_cluster) * 4 + le16_to_cpu(ods2p->hm2.hm2_w_ibmapsize) + ino);
+		return vbn2lbn(sb, ods2fhp->map, le16_to_cpu(ods2p->hm2->hm2_w_cluster) * 4 + le16_to_cpu(ods2p->hm2->hm2_w_ibmapsize) + ino);
 	}
 	return 0;
 }
@@ -309,6 +309,29 @@ int parse_options(struct super_block *sb, char *options) {
 	return tparse(&argblk, tpa1);
 }
 
+int	ods2_write_map(struct fh2def * fh2p,ODS2MAP * map) {
+
+	fh2p->fh2$b_mpoffset=0x64;
+	short * mp = (short*)fh2p + 0x64;
+	while (map) {
+		int i;
+		for(i=0;i<16;i++) {
+			int block_count = map->s1[i].cnt;
+			int start_pos = map->s1[i].lbn;
+			if (start_pos==0)
+				goto out;
+			*mp++ = (3 << 14) | ((block_count  - 1) >> 16);
+			*mp++ = (block_count - 1) & 0xffff;
+			*mp++ = (start_pos) & 0xffff;
+			*mp++ = (start_pos) >> 16;
+			fh2p->fh2$b_map_inuse += 4;
+
+		}
+		map=map->nxt;
+	}
+ out:
+	{}
+}
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically

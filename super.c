@@ -55,12 +55,12 @@ int ods2_statfs(struct super_block *sb, struct statfs *buf) {
 
 static struct super_operations ods2_sops = {
 	read_inode:	ods2_read_inode,
-	write_inode:	NULL,
+	write_inode:	ods2_write_inode,
 	put_inode:	ods2_put_inode,
 	delete_inode:	ods2_delete_inode,
 	clear_inode:	ods2_clear_inode,
 	put_super:	ods2_put_super,
-	write_super:	NULL,
+	write_super:	ods2_write_super,
 	statfs:		ods2_statfs,
 	remount_fs:	NULL,
 };
@@ -81,6 +81,7 @@ int ods2_read_bitmap(struct super_block *sb) {
 	struct buffer_head	   *bh;
 	struct inode		   *inode;
 	
+	printk("Reading bitmap\n");
 	if ((inode = iget(sb, 2)) != NULL) { /* this is BITMAP.SYS */
 		ODS2FH			 *ods2fhp = (ODS2FH *)(inode->u.generic_ip);
 		u32			  lbn;
@@ -95,7 +96,7 @@ int ods2_read_bitmap(struct super_block *sb) {
 			for (p = (short unsigned *)scb ; p < (short unsigned *)&(scb->scb_w_checksum) ; chksum += *p++);
 			
 			if (scb->u1.s1.scb_b_structlevl == 2 && scb->u1.s1.scb_b_structlevv >= 1 &&
-			    scb->scb_w_cluster == ods2p->hm2.hm2_w_cluster &&
+			    scb->scb_w_cluster == ods2p->hm2->hm2_w_cluster &&
 			    scb->scb_w_checksum == chksum) {
 				
 				struct buffer_head   *bh2;
@@ -126,6 +127,8 @@ int ods2_read_bitmap(struct super_block *sb) {
 				ods2p->statfs.f_bavail = bitset;
 				brelse(bh);
 				iput(inode);
+				lbn = vbn2lbn(sb, ods2fhp->map, 2);
+				ods2p->sbh = bread(sb->s_dev, lbn, (scb->scb$l_volsize/(512*8*scb->scb$w_cluster)+1)<<9);
 				return 1; /* everything went ok */
 			}
 			brelse(bh); /* invalid data in VBN 1 */
@@ -146,15 +149,16 @@ int ods2_read_ibitmap(struct super_block *sb) {
 	struct buffer_head	   *bh;
 	int			    idx;
 
+	printk("Reading ibitmap\n");
 	ods2p->statfs.f_ffree = 0;
-	if ((ods2p->ibitmap = kmalloc(ods2p->hm2.hm2_w_ibmapsize << 9, GFP_KERNEL)) != NULL) {
-		memset(ods2p->ibitmap, 0, (ods2p->hm2.hm2_w_ibmapsize << 9));
-		for (idx = 0 ; idx < ods2p->hm2.hm2_w_ibmapsize ; idx++) {
-			if ((bh = sb_bread(sb, GETBLKNO(sb, ods2p->hm2.hm2_l_ibmaplbn + idx))) != NULL && bh->b_data != NULL) {
-				u8      	   *bp = (GETBLKP(sb, ods2p->hm2.hm2_l_ibmaplbn + idx, bh->b_data));
+	if ((ods2p->ibitmap = kmalloc(ods2p->hm2->hm2_w_ibmapsize << 9, GFP_KERNEL)) != NULL) {
+		memset(ods2p->ibitmap, 0, (ods2p->hm2->hm2_w_ibmapsize << 9));
+		for (idx = 0 ; idx < ods2p->hm2->hm2_w_ibmapsize ; idx++) {
+			if ((bh = sb_bread(sb, GETBLKNO(sb, ods2p->hm2->hm2_l_ibmaplbn + idx))) != NULL && bh->b_data != NULL) {
+				u8      	   *bp = (GETBLKP(sb, ods2p->hm2->hm2_l_ibmaplbn + idx, bh->b_data));
 				int		    cnt;
 
-				memcpy((ods2p->ibitmap + (idx << 9)), GETBLKP(sb, ods2p->hm2.hm2_l_ibmaplbn + idx, bh->b_data), 512);
+				memcpy((ods2p->ibitmap + (idx << 9)), GETBLKP(sb, ods2p->hm2->hm2_l_ibmaplbn + idx, bh->b_data), 512);
 				for (cnt = 0; cnt < 512; cnt++, bp++) { ods2p->statfs.f_ffree += (nibble2bits[(*bp & 0x0f) ^ 0xf] + nibble2bits[(*bp >> 4) ^ 0xf]); }
 				bforget(bh);
 			}
@@ -174,6 +178,7 @@ static struct super_block * ods2_read_super(struct super_block *sb, void *data, 
 	struct buffer_head	   *bh;
 	ODS2SB			   *ods2p;
 
+	printk("in read_super\n");
 	sb_set_blocksize(sb, get_hardsect_size(sb->s_dev));
 	if ((bh = sb_bread(sb, GETBLKNO(sb, 1))) != NULL && bh->b_data != NULL) {
 
@@ -181,27 +186,37 @@ static struct super_block * ods2_read_super(struct super_block *sb, void *data, 
 		u16		    chksum1 = 0;
 		u16                 chksum2 = 0;
 
+		printk("Done bread\n");
 		if ((sb->u.generic_sbp = kmalloc(sizeof(ODS2SB), GFP_KERNEL)) == NULL) {
 			printk("ODS2-fs kmalloc failed for sb generic\n");
 			return NULL;
 		}
 		ods2p = (ODS2SB *)sb->u.generic_sbp;
-		memcpy(&ods2p->hm2, GETBLKP(sb, 1, bh->b_data), sizeof(HM2DEF));
-		brelse(bh);
+		//memcpy(&ods2p->hm2, GETBLKP(sb, 1, bh->b_data), sizeof(HM2DEF));
+		ods2p->bh = bh;
+		ods2p->hm2 = bh->b_data;
+		{ 
+			int i=0;
+			unsigned char * c=ods2p->hm2;
+			for(i=0;i<20;i++) printk("%x ",c[i]);
+		}
+		//brelse(bh);
 		
-		for (p = (u16 *)&(ods2p->hm2) ; p < (u16 *)&(ods2p->hm2.hm2_w_checksum1) ; chksum1 += *p++);
-		for (p = (u16 *)&(ods2p->hm2) ; p < (u16 *)&(ods2p->hm2.hm2_w_checksum2) ; chksum2 += *p++);
+		for (p = (u16 *)(ods2p->hm2) ; p < (u16 *)&(ods2p->hm2->hm2_w_checksum1) ; chksum1 += *p++);
+		for (p = (u16 *)(ods2p->hm2) ; p < (u16 *)&(ods2p->hm2->hm2_w_checksum2) ; chksum2 += *p++);
 
 		/*
 		  This is the way to check for a valid home block.
 		*/
 
-		if (ods2p->hm2.hm2_l_homelbn != 0 && ods2p->hm2.hm2_l_alhomelbn != 0 &&
-		    ods2p->hm2.hm2_l_altidxlbn != 0 && ods2p->hm2.hm2_w_cluster != 0 &&
-		    ods2p->hm2.u1.s1.hm2_b_structlevl == 2 && ods2p->hm2.u1.s1.hm2_b_structlevv >= 1 &&
-		    ods2p->hm2.hm2_w_homevbn != 0 && ods2p->hm2.hm2_l_ibmaplbn != 0 &&
-		    ods2p->hm2.hm2_l_maxfiles > ods2p->hm2.hm2_w_resfiles && ods2p->hm2.hm2_w_resfiles >= 5 &&
-		    chksum1 == ods2p->hm2.hm2_w_checksum1 && chksum2 == ods2p->hm2.hm2_w_checksum2) {
+		printk("chksum %x %x %x %x\n",chksum1,ods2p->hm2->hm2_w_checksum1,chksum2,ods2p->hm2->hm2_w_checksum2);
+
+		if (ods2p->hm2->hm2_l_homelbn != 0 && ods2p->hm2->hm2_l_alhomelbn != 0 &&
+		    ods2p->hm2->hm2_l_altidxlbn != 0 && ods2p->hm2->hm2_w_cluster != 0 &&
+		    ods2p->hm2->u1.s1.hm2_b_structlevl == 2 && ods2p->hm2->u1.s1.hm2_b_structlevv >= 1 &&
+		    ods2p->hm2->hm2_w_homevbn != 0 && ods2p->hm2->hm2_l_ibmaplbn != 0 &&
+		    ods2p->hm2->hm2_l_maxfiles > ods2p->hm2->hm2_w_resfiles && ods2p->hm2->hm2_w_resfiles >= 5 &&
+		    chksum1 == ods2p->hm2->hm2_w_checksum1 && chksum2 == ods2p->hm2->hm2_w_checksum2) {
 			
 
 			ods2p->flags.v_raw = 0;
@@ -217,6 +232,8 @@ static struct super_block * ods2_read_super(struct super_block *sb, void *data, 
 			
 			sb->s_root = d_alloc_root(iget(sb, 4)); /* this is 000000.DIR;1 */
 			
+			ods2p->ibh = bread(sb->s_dev, ods2p->hm2->hm2$l_ibmaplbn, ods2p->hm2->hm2$w_ibmapsize << 9);;
+
 			/*
 			  We need to be able to read the index file header bitmap.
 			*/
@@ -242,14 +259,14 @@ static struct super_block * ods2_read_super(struct super_block *sb, void *data, 
 					
 					ods2p->statfs.f_type = 0x3253444f; /* 2SDO */
 					ods2p->statfs.f_bsize = 512;
-					ods2p->statfs.f_files = ods2p->hm2.hm2_l_maxfiles;
+					ods2p->statfs.f_files = ods2p->hm2->hm2_l_maxfiles;
 					ods2p->statfs.f_namelen = 80;
 		
-					memcpy(format, ods2p->hm2.hm2_t_format, 12);
+					memcpy(format, ods2p->hm2->hm2_t_format, 12);
 					format[12] = 0;
-					memcpy(volname, ods2p->hm2.hm2_t_volname, 12);
+					memcpy(volname, ods2p->hm2->hm2_t_volname, 12);
 					volname[12] = 0;
-					memcpy(volowner, ods2p->hm2.hm2_t_ownername, 12);
+					memcpy(volowner, ods2p->hm2->hm2_t_ownername, 12);
 					volowner[12] = 0;
 					printk("ODS2-fs This is a valid ODS2 file system with format /%s/ and volume name /%s/ and owner /%s/\n", format, volname, volowner);
 					return sb;
@@ -260,6 +277,45 @@ static struct super_block * ods2_read_super(struct super_block *sb, void *data, 
 		kfree(sb->u.generic_sbp);
 	}
 	return NULL;
+}
+
+static void ods2_commit_super (struct super_block * sb,
+                               struct ods2sb * es)
+{
+        //es->s_wtime = cpu_to_le32(CURRENT_TIME);
+        mark_buffer_dirty(((struct ods2sb *)sb->u.generic_sbp)->bh);
+        sb->s_dirt = 0;
+}
+
+static void ods2_sync_super(struct super_block *sb, struct hm2def *es)
+{
+        //es->s_wtime = cpu_to_le32(CURRENT_TIME);
+        mark_buffer_dirty(ODS2_SB(sb)->bh);
+        ll_rw_block(WRITE, 1, &ODS2_SB(sb)->bh);
+        wait_on_buffer(ODS2_SB(sb)->bh);
+        sb->s_dirt = 0;
+}
+
+void ods2_write_super (struct super_block * sb)
+{
+        struct hm2def * es;
+	struct ods2sb * osb = sb -> u.generic_sbp;
+
+        if (!(sb->s_flags & MS_RDONLY)) {
+                es = osb->hm2;
+
+#if 0
+                if (le16_to_cpu(es->s_state) & EXT2_VALID_FS) {
+                        ext2_debug ("setting valid to 0\n");
+                        es->s_state = cpu_to_le16(le16_to_cpu(es->s_state) &
+                                                  ~EXT2_VALID_FS);
+                        es->s_mtime = cpu_to_le32(CURRENT_TIME);
+                        ods2_sync_super(sb, es);
+                } else
+#endif
+                        ods2_commit_super (sb, es);
+        }
+        sb->s_dirt = 0;
 }
 
 static DECLARE_FSTYPE_DEV(ods2_fs_type, "ods2", ods2_read_super);

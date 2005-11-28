@@ -455,10 +455,59 @@ typedef struct ods2fh {
 #define SB_M_RAW	   8
 #define SB_M_LOWERCASE	   16
 
+#define ODS2_SB(sb) ((struct ods2sb *)(sb->u.generic_sbp))
+#define VMSSWAP(l) ((l & 0xffff) << 16 | l >> 16)
+#define FAT$C_SEQUENTIAL FAT_C_SEQUANTIAL
+#define FAT$C_FIXED FAT_C_FIXED
+#define fat$l_hiblk u1.fat_l_hiblk
+#define fat$l_efblk u2.fat_l_efblk
+#define fat$w_ffbyte fat_w_ffbyte
+#define fat$b_rtype u0.fat_b_rtype
+#define fat$w_maxrec fat_w_maxrec
+#define fat$w_versions fat_w_versions
+#define scb$l_volsize scb_l_volsize
+#define scb$w_cluster scb_w_cluster
+#define hm2$l_ibmaplbn hm2_l_ibmaplbn
+#define hm2$w_ibmapsize hm2_w_ibmapsize
+#define hm2$w_cluster hm2_w_cluster
+#define fh2$b_idoffset fh2_b_idoffset
+#define fh2$b_mpoffset fh2_b_mpoffset
+#define fh2$b_map_inuse fh2_b_map_inuse
+
+#define SS$_NORMAL 1
+#define SS$_BADPARAM    0x0014
+#define SS$_BADFILENAME 0x0818
+#define SS$_BADIRECTORY 0x0828
+#define SS$_DUPFILENAME 0x0868
+#define SS$_NOSUCHFILE  0x0910 
+#define SS$_NOMOREFILES 0x0930
+
+#ifdef VMS_BIG_ENDIAN
+#define WORK_UNIT unsigned char
+#define WORK_MASK 0xff
+#else
+#define WORK_UNIT unsigned int
+#define WORK_MASK 0xffffffff
+#endif
+#define WORK_BITS (sizeof(WORK_UNIT) * 8)
+
+#ifdef VMS_BIG_ENDIAN
+#define VMSLONG(l) ((l & 0xff) << 24 | (l & 0xff00) << 8 | (l & 0xff0000) >> 8 |l >> 24)
+#define VMSWORD(w) ((w & 0xff) << 8 | w >> 8)
+#define VMSSWAP(l) ((l & 0xff0000) << 8 | (l & 0xff000000) >> 8 |(l & 0xff) << 8| (l & 0xff00) >> 8)
+#else
+#define VMSLONG(l) l
+#define VMSWORD(w) w
+#define VMSSWAP(l) ((l & 0xffff) << 16 | l >> 16)
+#endif
+
 typedef struct ods2sb {
-	HM2DEF			  hm2;
+	struct buffer_head * bh;
+	HM2DEF			*  hm2;
+	struct buffer_head * ibh;
 	struct inode		 *indexf;  /* INDEXF.SYS */
 	u8			 *ibitmap; /* index file header bitmap */
+	struct buffer_head * sbh;
 	struct statfs		  statfs;
 	struct {
 		int		  v_version:3; /* what to do with file versions */
@@ -521,6 +570,11 @@ void ods2_read_inode(struct inode *inode);
 void ods2_put_inode(struct inode *inode);
 void ods2_clear_inode(struct inode *inode);
 void ods2_delete_inode(struct inode *inode);
+void ods2_write_inode (struct inode *inode, int wait);
+void ods2_write_super (struct super_block * sb);
+int ods2_create (struct inode * dir, struct dentry * dentry, int mode);
+int ods2_link (struct dentry * old_dentry, struct inode * dir, struct dentry *dentry);
+int ods2_mkdir(struct inode * dir, struct dentry * dentry, int mode);
 
 /*
   dir.c

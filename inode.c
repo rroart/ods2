@@ -33,11 +33,14 @@ struct file_operations ods2_dir_operations = {
 	release:	ods2_open_release,
 	ioctl:		NULL,
 	fsync:		NULL,
+	llseek:         generic_file_llseek,
+	mmap:           generic_file_mmap,
 };
 
 
 struct file_operations ods2_file_operations = {
 	read:		ods2_read,
+	write:          generic_file_write,
 	readdir:	NULL,
 	llseek:		ods2_llseek,
 	open:		ods2_open_release,
@@ -48,9 +51,9 @@ struct file_operations ods2_file_operations = {
 
 
 struct inode_operations ods2_dir_inode_operations = {
-	create:		NULL,
+	create:		ods2_create,
 	lookup:		ods2_lookup,
-	link:		NULL,
+	link:		ods2_link,
 	unlink:		NULL,
 	symlink:	NULL,
 	mkdir:		NULL,
@@ -318,6 +321,360 @@ void ods2_clear_inode(struct inode *inode) {
 
 void ods2_delete_inode(struct inode *inode) {
 	clear_inode(inode);
+}
+
+static int ods2_update_inode(struct inode * inode, int do_sync)
+{
+	struct buffer_head * bh;
+	struct fh2def * fh2p;
+	int err = 0;
+	signed int fhlbn;
+
+	if ((fhlbn = ino2fhlbn(inode->i_sb, inode->i_ino)) > 0 &&
+	    (!(bh = sb_bread(inode->i_sb, GETBLKNO(inode->i_sb, fhlbn))) != NULL && bh->b_data != NULL)) {
+#if 0
+		ods2_error (inode->i_sb, "ods2_write_inode",
+			    "unable to read inode block - "
+			    "inode=%lu, block=%lu", inode->i_ino, fhlbn);
+#endif
+		return -EIO;
+	}
+
+	fh2p = bh->b_data;
+
+	
+	
+	ODS2FH		       *ods2fhp;
+	FI2DEF		       *fi2p;
+	FATDEF		       *fatp;
+
+	ods2fhp = (ODS2FH *)inode->u.generic_ip;
+	fh2p->fh2$b_idoffset=0x28;
+	ods2_write_map(fh2p,ods2fhp->map);
+	fi2p = (FI2DEF *)((short unsigned *)fh2p + fh2p->fh2_b_idoffset);
+	fatp = (FATDEF *)&(fh2p->fh2_w_recattr);
+
+	memcpy(fatp, &ods2fhp->fat, sizeof(FATDEF));
+	//ods2fhp->map = getmap(sb, fh2p);
+
+	switch (inode->i_mode) {
+	case S_IFDIR:
+		fh2p->u4.s1.fch_v_directory=1;
+		break;
+	case S_IFREG:
+		break;
+	default:
+		panic("unknown mode\n");
+		break;
+	}
+
+	fh2p->u5.s1.fh2_w_mem=cpu_to_le16(inode->i_uid);
+	fh2p->u5.s1.fh2_w_grp=cpu_to_le16(inode->i_gid);
+		
+#if 0		
+	fi2p->fi2_q_credate=unix2vmstime(inode->i_ctime);
+	fi2p->fi2_q_revdate=unix2vmstime(inode->i_mtime);
+	fi2p->fi2_q_revdate=unix2vmstime(inode->i_atime);
+#endif
+				
+	/*
+	  Note that we don't use the system protection bits for ODS2.
+	*/
+
+#if 0
+// not yet				
+	inode->i_mode |= vms2unixprot[(le16_to_cpu(fh2p->fh2_w_fileprot) >> 4) & 0x0f] << 6; /* owner */
+	inode->i_mode |= vms2unixprot[(le16_to_cpu(fh2p->fh2_w_fileprot) >> 8) & 0x0f] << 3; /* group */
+	inode->i_mode |= vms2unixprot[(le16_to_cpu(fh2p->fh2_w_fileprot) >> 12) & 0x0f];     /* world => other */
+#endif		
+		
+	fatp->fat$w_maxrec = 512;
+	fatp->fat$b_rtype=(FAT$C_SEQUENTIAL << 4) | FAT$C_FIXED;
+
+	fatp->fat$l_hiblk=VMSSWAP((1+inode->i_blocks));
+	fatp->fat$l_efblk=VMSSWAP((1+inode->i_size/512));
+	fatp->fat$w_ffbyte=inode->i_size%512;
+
+#if 0
+	inode->i_blocks = ((le16_to_cpu(fatp->u1.s1.fat_w_hiblkh) << 16) | le16_to_cpu(fatp->u1.s1.fat_w_hiblkl));
+	inode->i_size = ((le16_to_cpu(fatp->u2.s1.fat_w_efblkh) << 16) | le16_to_cpu(fatp->u2.s1.fat_w_efblkl)) << 9;
+	if (inode->i_size > 0) { inode->i_size -= 512; }
+#endif
+	fatp->fat$w_versions=1;
+				
+	ods2fhp->parent = (fh2p->u6.s1.fid_b_nmx << 16) |  le16_to_cpu(fh2p->u6.s1.fid_w_num);
+
+	ods2_write_super(inode->i_sb);
+	
+	mark_buffer_dirty(bh);
+	if (do_sync) {
+		ll_rw_block (WRITE, 1, &bh);
+		wait_on_buffer (bh);
+		if (buffer_req(bh) && !buffer_uptodate(bh)) {
+			printk ("IO error syncing ods2 inode ["
+				"%s:%08lx]\n",
+				bdevname(inode->i_dev), inode->i_ino);
+			err = -EIO;
+		}
+	}
+	brelse (bh);
+	return err;
+}
+
+void ods2_write_inode (struct inode * inode, int wait)
+{
+        //lock_kernel();
+        ods2_update_inode (inode, wait);
+        //unlock_kernel();
+}
+
+int ods2_sync_inode (struct inode *inode)
+{
+        return ods2_update_inode (inode, 1);
+}
+
+static int ods2_link (struct dentry * old_dentry, struct inode * dir,
+	struct dentry *dentry)
+{
+	struct inode *inode = old_dentry->d_inode;
+
+	if (S_ISDIR(inode->i_mode))
+		return -EPERM;
+
+	if (inode->i_nlink >= 42 /*ODS2_LINK_MAX not yet? */)
+		return -EMLINK;
+
+	inode->i_ctime = CURRENT_TIME;
+	ods2_inc_count(inode);
+	atomic_inc(&inode->i_count);
+
+	return ods2_add_nondir(dentry, inode);
+}
+
+static inline void ods2_inc_count(struct inode *inode)
+{
+        inode->i_nlink++;
+        mark_inode_dirty(inode);
+}
+
+static inline void ods2_dec_count(struct inode *inode)
+{
+        inode->i_nlink--;
+        mark_inode_dirty(inode);
+}
+
+/*
+ * Set the first fragment of directory.
+ */
+int ods2_make_empty(struct inode *inode, struct inode *parent)
+{
+	panic("not yet\n");
+#if 0
+	short buf[256];
+
+	memset(buf, 0, 512);
+	buf[0]=0xffff;
+
+
+	int err=0;
+
+	struct page     *page, *cached_page = 0;
+	struct address_space *mapping = inode->i_mapping;
+
+
+	page = __grab_cache_page(mapping, index, &cached_page);
+	if (!page)
+		break;
+
+	/* We have exclusive IO access to the page.. */
+	if (!PageLocked(page)) {
+		PAGE_BUG(page);
+	}
+
+	kaddr = kmap(page);
+	status = mapping->a_ops->prepare_write(file, page, offset, offs\
+					       et+bytes);
+	if (status)
+		goto sync_failure;
+	page_fault = __copy_from_user(kaddr+offset, buf, bytes);
+	flush_dcache_page(page);
+	status = mapping->a_ops->commit_write(file, page, offset, offse\
+					      t+bytes);
+
+
+
+	if (err)
+		goto fail;
+
+fail:
+	return err;
+#endif
+}
+
+static int ods2_get_block(struct inode *inode, long iblock, struct buffer_head *
+			  bh_result, int create)
+{
+	int lbn;
+	struct super_block * sb=inode->i_sb;
+	ODS2SB * ods2p;
+	ODS2FH                   *ods2fhp=(ODS2FH *)inode->u.generic_ip;
+	ODS2MAP * map, * newmap;
+	int pos;
+	struct hm2def * hm2;
+	int vbn=iblock;
+	int i;
+
+	lbn = vbn2lbn(sb, ods2fhp->map, vbn);
+
+	if (lbn > 0) {
+		bh_result->b_dev = inode->i_dev;
+                bh_result->b_blocknr = lbn;
+                bh_result->b_state |= (1UL << BH_Mapped);
+		return 0;
+	}
+
+	if (create == 0)
+		return -1;
+
+	sb = inode->i_sb;
+	ods2p = ODS2_SB(sb);
+	ods2fhp = inode->u.generic_ip;
+
+	bitmap_search(sb, &pos, 1);
+	bitmap_modify(sb, pos, 1, 0);
+
+	//new_map = kmalloc(sizeof(ODS2MAP), GFP_KERNEL);
+	
+	hm2=ods2p->hm2;
+	lbn=hm2->hm2$w_cluster*pos;
+
+	//new_map->lbn=lbn;
+	//new_map->cnt=1 * hm2->hm2$w_cluster;
+
+	map = ods2fhp->map;
+
+	for(i=0;i<16;i++) {
+		if (map->s1[i].lbn==0) {
+			map->s1[i].lbn=lbn;
+			map->s1[i].lbn=1 * hm2->hm2$w_cluster;
+			goto map_set;
+		}
+	}
+
+	map->nxt = kmalloc(sizeof(ODS2MAP), GFP_KERNEL);
+	map = map->nxt;
+	memset(map, 0, sizeof(ODS2MAP));
+
+	i=0;
+	map->s1[i].lbn=lbn;
+	map->s1[i].lbn=1 * hm2->hm2$w_cluster;
+
+ map_set:
+
+	bh_result->b_dev = inode->i_dev;
+	bh_result->b_blocknr = lbn;
+	bh_result->b_state |= (1UL << BH_New) | (1UL << BH_Mapped);
+	return 0;
+}
+
+static int ods2_writepage(struct page *page)
+{
+        return block_write_full_page(page,ods2_get_block);
+}
+static int ods2_readpage(struct file *file, struct page *page)
+{
+        return block_read_full_page(page,ods2_get_block);
+}
+static int ods2_prepare_write(struct file *file, struct page *page, unsigned from, unsigned to)
+{
+        return block_prepare_write(page,from,to,ods2_get_block);
+}
+static int ods2_bmap(struct address_space *mapping, long block)
+{
+        return generic_block_bmap(mapping,block,ods2_get_block);
+}
+static int ods2_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsigned long blocknr, int blocksize)
+{
+        return generic_direct_IO(rw, inode, iobuf, blocknr, blocksize, ods2_get_block);
+}
+struct address_space_operations ods2_aops = {
+        readpage: ods2_readpage,
+        writepage: ods2_writepage,
+        sync_page: block_sync_page,
+        prepare_write: ods2_prepare_write,
+        commit_write: generic_commit_write,
+        bmap: ods2_bmap,
+        direct_IO: ods2_direct_IO,
+};
+
+static int ods2_create (struct inode * dir, struct dentry * dentry, int mode)
+{
+	struct inode * inode = ods2_new_inode (dir, mode);
+	int err = PTR_ERR(inode);
+	if (!IS_ERR(inode)) {
+		inode->i_op = &ods2_file_operations;
+		inode->i_fop = &ods2_file_operations;
+		inode->i_mapping->a_ops = &ods2_aops;
+		mark_inode_dirty(inode);
+		err = ods2_add_nondir(dentry, inode);
+	}
+	return err;
+}
+
+static int ods2_mkdir(struct inode * dir, struct dentry * dentry, int mode)
+{
+	struct inode * inode;
+	int err = -EMLINK;
+
+#if 0
+	if (dir->i_nlink >= ODS2_LINK_MAX)
+		goto out;
+#endif
+
+	ods2_inc_count(dir);
+
+	inode = ods2_new_inode (dir, S_IFDIR | mode);
+	err = PTR_ERR(inode);
+	if (IS_ERR(inode))
+		goto out_dir;
+
+	inode->i_op = &ods2_dir_inode_operations;
+	inode->i_fop = &ods2_dir_operations;
+	inode->i_mapping->a_ops = &ods2_aops;
+
+	ods2_inc_count(inode);
+
+	err = ods2_make_empty(inode, dir);
+	if (err)
+		goto out_fail;
+
+	err = ods2_add_link(dentry, inode);
+	if (err)
+		goto out_fail;
+
+	d_instantiate(dentry, inode);
+out:
+	return err;
+
+out_fail:
+	ods2_dec_count(inode);
+	ods2_dec_count(inode);
+	iput(inode);
+out_dir:
+	ods2_dec_count(dir);
+	goto out;
+}
+
+int ods2_add_nondir(struct dentry *dentry, struct inode *inode)
+{
+	int err = ods2_add_link(dentry, inode);
+	if (!err) {
+		d_instantiate(dentry, inode);
+		return 0;
+	}
+	ods2_dec_count(inode);
+	iput(inode);
+	return err;
 }
 
 /*

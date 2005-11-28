@@ -1,10 +1,10 @@
 
 TARGET	= ods2.o
-OBJECTS	= super.o inode.o file.o dir.o util.o tparse.o
+OBJECTS	= super.o inode.o file.o dir.o util.o tparse.o bitmap.o
 INCLUDE	= ods2.h tparse.h
 DEBUG	= -g
 OPTIMIZE= 
-CFLAGS	= -D__KERNEL__ -I/usr/src/linux-2.4.20/include -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fno-strict-aliasing -fno-common -fomit-frame-pointer -pipe -mpreferred-stack-boundary=2 -march=i686 -DMODULE -DMODVERSIONS -include /usr/src/linux-2.4.20/include/linux/modversions.h  -nostdinc -iwithprefix include
+CFLAGS	= -D__KERNEL__ -I/usr/src/linux-2.4.20/include -Wall -Wstrict-prototypes -Wno-trigraphs -O2 -fno-strict-aliasing -fno-common -fomit-frame-pointer -pipe -mpreferred-stack-boundary=2 -march=i586 -DMODULE -nostdinc -iwithprefix include
 
 $(TARGET): $(OBJECTS)
 	rm -f $(TARGET)
