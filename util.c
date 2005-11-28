@@ -12,16 +12,22 @@
  */
 
 #include <linux/config.h>
-/*
+#ifdef TWOSIX
 #include <linux/module.h>
-*/
+#endif
 #include <linux/string.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#ifndef TWOSIX
 #include <linux/locks.h>
+#endif
 #include <linux/blkdev.h>
+#ifndef TWOSIX
 #include <asm/uaccess.h>
+#else
+#include <linux/buffer_head.h>
+#endif
 
 #include "ods2.h"
 #include "tparse.h"
@@ -60,15 +66,15 @@ u32 vbn2lbn(struct super_block *sb, ODS2MAP *map, u32 vbn) {
 
 
 u32 ino2fhlbn(struct super_block *sb, u32 ino) {
-	ODS2SB			   *ods2p = (ODS2SB *)sb->u.generic_sbp;
+	ODS2SB			   *ods2p = ODS2_SB(sb);
 	
-	//printk("hm2 cont %x %x %x\n",ino,ods2p->hm2->hm2_w_ibmapsize,ods2p->hm2->hm2_l_ibmaplbn);
+	//printk("hm2 cont %x %x %x\n",ino,ods2p->hm2->hm2$w_ibmapsize,ods2p->hm2->hm2$l_ibmaplbn);
 	if (ino < 17) { /* the first 16 file headers are located at known locations in INDEXF.SYS */
-		return le16_to_cpu(ods2p->hm2->hm2_w_ibmapsize) + le32_to_cpu(ods2p->hm2->hm2_l_ibmaplbn) + ino - 1;
+		return le16_to_cpu(ods2p->hm2->hm2$w_ibmapsize) + le32_to_cpu(ods2p->hm2->hm2$l_ibmaplbn) + ino - 1;
 	} else {
 		ODS2FH		   *ods2fhp = (ODS2FH *)ods2p->indexf->u.generic_ip;
 		
-		return vbn2lbn(sb, ods2fhp->map, le16_to_cpu(ods2p->hm2->hm2_w_cluster) * 4 + le16_to_cpu(ods2p->hm2->hm2_w_ibmapsize) + ino);
+		return vbn2lbn(sb, ods2fhp->map, le16_to_cpu(ods2p->hm2->hm2$w_cluster) * 4 + le16_to_cpu(ods2p->hm2->hm2$w_ibmapsize) + ino);
 	}
 	return 0;
 }
@@ -82,7 +88,7 @@ u32 ino2fhlbn(struct super_block *sb, u32 ino) {
 */
 
 ODS2MAP *getmap(struct super_block *sb, FH2DEF *fh2p) {
-	FM2DEF			   *fm2p = (FM2DEF *)((short unsigned *)fh2p + fh2p->fh2_b_mpoffset);
+	FM2DEF			   *fm2p = (FM2DEF *)((short unsigned *)fh2p + fh2p->fh2$b_mpoffset);
 	ODS2MAP			   *map = kmalloc(sizeof(ODS2MAP), GFP_KERNEL);
 	ODS2MAP			   *mapfst = map;
 	struct buffer_head	   *bh = NULL;
@@ -95,19 +101,19 @@ ODS2MAP *getmap(struct super_block *sb, FH2DEF *fh2p) {
 	}
 	memset(map, 0, sizeof(ODS2MAP));
 	do {
-		mapinuse = fh2p->fh2_b_map_inuse;
-		while (fm2p < (FM2DEF *)((short unsigned *)fh2p + fh2p->fh2_b_acoffset) && mapinuse > 0) {
+		mapinuse = fh2p->fh2$b_map_inuse;
+		while (fm2p < (FM2DEF *)((short unsigned *)fh2p + fh2p->fh2$b_acoffset) && mapinuse > 0) {
 			u32			  cnt = 0;
 			u32			  lbn = 0;
 			u16      		  size = 0;
 			
-			switch (fm2p->u1.fm1.fm2_v_format) {
+			switch (fm2p->u1.fm1.fm2$v_format) {
 			case 0: size = 1; break;
-			case 1: cnt = fm2p->u1.fm1.fm2_b_count1; lbn = (fm2p->u1.fm1.fm2_v_highlbn << 16) | fm2p->u1.fm1.fm2_w_lowlbn; size = 2; break;
-			case 2: cnt = fm2p->u1.fm2.fm2_v_count2; lbn = (le16_to_cpu(fm2p->u1.fm2.fm2_l_lbn2[1]) << 16) | le16_to_cpu(fm2p->u1.fm2.fm2_l_lbn2[0]); size = 3; break;
-			case 3: cnt = (fm2p->u1.fm3.fm2_v_count2 << 16) | le16_to_cpu(fm2p->u1.fm3.fm2_w_lowcount); lbn = le32_to_cpu(fm2p->u1.fm3.fm2_l_lbn3); size = 4; break;
+			case 1: cnt = fm2p->u1.fm1.fm2$b_count1; lbn = (fm2p->u1.fm1.fm2$v_highlbn << 16) | fm2p->u1.fm1.fm2$w_lowlbn; size = 2; break;
+			case 2: cnt = fm2p->u1.fm2.fm2$v_count2; lbn = (le16_to_cpu(fm2p->u1.fm2.fm2$l_lbn2[1]) << 16) | le16_to_cpu(fm2p->u1.fm2.fm2$l_lbn2[0]); size = 3; break;
+			case 3: cnt = (fm2p->u1.fm3.fm2$v_count2 << 16) | le16_to_cpu(fm2p->u1.fm3.fm2$w_lowcount); lbn = le32_to_cpu(fm2p->u1.fm3.fm2$l_lbn3); size = 4; break;
 			}
-			if (fm2p->u1.fm1.fm2_v_format > 0) {
+			if (fm2p->u1.fm1.fm2$v_format > 0) {
 				if (idx > 15) {
 					if ((map->nxt = kmalloc(sizeof(ODS2MAP), GFP_KERNEL)) != NULL) {
 						map = map->nxt;
@@ -135,15 +141,15 @@ ODS2MAP *getmap(struct super_block *sb, FH2DEF *fh2p) {
 		  can be used as an inode.
 		*/
 		
-		if (fh2p->u3.s1.fid_w_ex_fidnum != 0) {
+		if (fh2p->u3.s1.fid$w_ex_fidnum != 0) {
 			u32			 lbn;
 			
-			if ((lbn = ino2fhlbn(sb, le16_to_cpu(fh2p->u3.s1.fid_w_ex_fidnum) | (fh2p->u3.s1.fid_b_ex_fidnmx << 16))) != 0) {
+			if ((lbn = ino2fhlbn(sb, le16_to_cpu(fh2p->u3.s1.fid$w_ex_fidnum) | (fh2p->u3.s1.fid$b_ex_fidnmx << 16))) != 0) {
 				fh2p = NULL;
 				brelse(bh);
 				if ((bh = sb_bread(sb, GETBLKNO(sb, lbn))) != NULL && bh->b_data != NULL) {
 					fh2p = (FH2DEF *)(GETBLKP(sb, lbn, bh->b_data));
-					fm2p = (FM2DEF *)((short unsigned *)fh2p + fh2p->fh2_b_mpoffset);
+					fm2p = (FM2DEF *)((short unsigned *)fh2p + fh2p->fh2$b_mpoffset);
 				}
 			}
 		} else {
@@ -190,15 +196,15 @@ int verify_fh(FH2DEF *fh2p, u32 ino) {
 	u16      	       *p = (short unsigned *)fh2p;
 	u16      		chksum = 0;
 
-	for (; p < (short unsigned *)&(fh2p->fh2_w_checksum) ; chksum += le16_to_cpu(*p++));
-	if (fh2p->fh2_b_idoffset <= fh2p->fh2_b_mpoffset &&
-	    fh2p->fh2_b_mpoffset <= fh2p->fh2_b_acoffset &&
-	    fh2p->fh2_b_acoffset <= fh2p->fh2_b_rsoffset &&
-	    fh2p->u1.s1.fh2_b_structlevl == 2 && fh2p->u1.s1.fh2_b_structlevv >= 1 &&
-	    fh2p->u2.s1.fh2_w_fid_num != 0 &&
-	    ((fh2p->u2.s1.fh2_b_fid_nmx << 16) | le16_to_cpu(fh2p->u2.s1.fh2_w_fid_num)) == ino &&
-	    fh2p->fh2_b_map_inuse <= (fh2p->fh2_b_acoffset - fh2p->fh2_b_mpoffset) &&
-	    le16_to_cpu(fh2p->fh2_w_checksum) == chksum) {
+	for (; p < (short unsigned *)&(fh2p->fh2$w_checksum) ; chksum += le16_to_cpu(*p++));
+	if (fh2p->fh2$b_idoffset <= fh2p->fh2$b_mpoffset &&
+	    fh2p->fh2$b_mpoffset <= fh2p->fh2$b_acoffset &&
+	    fh2p->fh2$b_acoffset <= fh2p->fh2$b_rsoffset &&
+	    fh2p->u1.s1.fh2$b_structlevl == 2 && fh2p->u1.s1.fh2$b_structlevv >= 1 &&
+	    fh2p->fh2$w_fid_num != 0 &&
+	    ((fh2p->u2.s1.fh2$b_fid_nmx << 16) | le16_to_cpu(fh2p->fh2$w_fid_num)) == ino &&
+	    fh2p->fh2$b_map_inuse <= (fh2p->fh2$b_acoffset - fh2p->fh2$b_mpoffset) &&
+	    le16_to_cpu(fh2p->fh2$w_checksum) == chksum) {
 
 		return 1; /* it is a valid file header */
 	}
@@ -208,7 +214,7 @@ int verify_fh(FH2DEF *fh2p, u32 ino) {
 
 int save_raw(ARGBLK *argblk) {
 	struct super_block	   *sb = (void *)argblk->arg;
-	ODS2SB			   *ods2p = (void *)sb->u.generic_sbp;
+	ODS2SB			   *ods2p = (void *)ODS2_SB(sb);
 
 	ods2p->flags.v_raw = 1;
 	return 1;
@@ -217,7 +223,7 @@ int save_raw(ARGBLK *argblk) {
 
 int save_lowercase(ARGBLK *argblk) {
 	struct super_block	   *sb = (void *)argblk->arg;
-	ODS2SB			   *ods2p = (void *)sb->u.generic_sbp;
+	ODS2SB			   *ods2p = (void *)ODS2_SB(sb);
 
 	ods2p->flags.v_lowercase = 1;
 	return 1;
@@ -226,7 +232,7 @@ int save_lowercase(ARGBLK *argblk) {
 
 int save_dollar(ARGBLK *argblk) {
 	struct super_block	   *sb = (void *)argblk->arg;
-	ODS2SB			   *ods2p = (void *)sb->u.generic_sbp;
+	ODS2SB			   *ods2p = (void *)ODS2_SB(sb);
 
 	ods2p->dollar = argblk->token[0];
 	return 1;
@@ -235,7 +241,7 @@ int save_dollar(ARGBLK *argblk) {
 
 int save_semicolon(ARGBLK *argblk) {
 	struct super_block	   *sb = (void *)argblk->arg;
-	ODS2SB			   *ods2p = (void *)sb->u.generic_sbp;
+	ODS2SB			   *ods2p = (void *)ODS2_SB(sb);
 
 	ods2p->semicolon = argblk->token[0];
 	return 1;
@@ -244,7 +250,7 @@ int save_semicolon(ARGBLK *argblk) {
 
 int save_version(ARGBLK *argblk) {
 	struct super_block	   *sb = (void *)argblk->arg;
-	ODS2SB			   *ods2p = (void *)sb->u.generic_sbp;
+	ODS2SB			   *ods2p = (void *)ODS2_SB(sb);
 
 	ods2p->flags.v_version = argblk->mask;
 	return 1;
@@ -288,9 +294,9 @@ TPARSE tpa20[] = {
 };
 
 TPARSE tpa21[] = {
-  { "all", tpa1, save_version, SB_M_VERSALL, NULL, 0 },
-  { "highest", tpa1, save_version, SB_M_VERSHIGH, NULL, 0 },
-  { "none", tpa1, save_version, SB_M_VERSNONE, NULL, 0 },
+  { "all", tpa1, save_version, SB$M_VERSALL, NULL, 0 },
+  { "highest", tpa1, save_version, SB$M_VERSHIGH, NULL, 0 },
+  { "none", tpa1, save_version, SB$M_VERSNONE, NULL, 0 },
   TPA_END
 };
 
@@ -365,6 +371,91 @@ unsigned short checksum(vmsword *block)
 		result += VMSWORD(data);
 	} while (--count > 0);
 	return result;
+}
+
+typedef char chartype;
+
+char *
+my_strstr (phaystack, pneedle)
+const char *phaystack;
+const char *pneedle;
+{
+	const unsigned char *haystack, *needle;
+	chartype b;
+	const unsigned char *rneedle;
+
+	haystack = (const unsigned char *) phaystack;
+
+	if ((b = *(needle = (const unsigned char *) pneedle)))
+	{
+		chartype c;
+		haystack--;               /* possible ANSI violation */
+
+		{
+			chartype a;
+        do
+		if (!(a = *++haystack))
+			goto ret0;
+        while (a != b);
+		}
+
+		if (!(c = *++needle))
+			goto foundneedle;
+		++needle;
+		goto jin;
+
+		for (;;)
+		{
+			{
+				chartype a;
+				if (0)
+					jin:{
+					if ((a = *++haystack) == c)
+						goto crest;
+				}
+				else
+					a = *++haystack;
+            do
+	    {
+		    for (; a != b; a = *++haystack)
+		    {
+			    if (!a)
+				    goto ret0;
+			    if ((a = *++haystack) == b)
+				    break;
+			    if (!a)
+				    goto ret0;
+		    }
+	    }
+            while ((a = *++haystack) != c);
+			}
+		crest:
+			{
+				chartype a;
+				{
+					const unsigned char *rhaystack;
+					if (*(rhaystack = haystack-- + 1) == (a = *(rneedle = needle)))
+                do
+		{
+			if (!a)
+				goto foundneedle;
+			if (*++rhaystack != (a = *++needle))
+				break;
+			if (!a)
+				goto foundneedle;
+		}
+                while (*++rhaystack == (a = *++needle));
+					needle = rneedle; /* took the register-poor aproach */
+				}
+				if (!a)
+					break;
+			}
+		}
+	}
+ foundneedle:
+	return (char *) haystack;
+ ret0:
+	return 0;
 }
 
 /*

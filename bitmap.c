@@ -72,6 +72,7 @@ repeat:
 
 	ods2fhp = (ODS2FH *)inode->u.generic_ip;
 	ods2fhp->map = kmalloc(sizeof(ODS2MAP),GFP_KERNEL);
+	memset(ods2fhp->map, 0, sizeof(ODS2MAP));
 	ods2fhp->ods2vari = NULL;
 
 	fatp = (FATDEF *)&(ods2fhp->fat);

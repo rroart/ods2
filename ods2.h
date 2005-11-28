@@ -11,6 +11,10 @@
  *
  */
 
+#ifdef TWOSIX
+#include <linux/statfs.h>
+#endif
+
 /*
   The followinf structures are defined in the book
   "VMS File System Internals"
@@ -21,58 +25,58 @@
 */
 
 typedef struct hm2def {
-	u32		     hm2_l_homelbn;
-	u32		     hm2_l_alhomelbn;
-	u32		     hm2_l_altidxlbn;
+	u32		     hm2$l_homelbn;
+	u32		     hm2$l_alhomelbn;
+	u32		     hm2$l_altidxlbn;
 	union {
-		u16	     hm2_w_struclev;
+		u16	     hm2$w_struclev;
 		struct {
-			u8   hm2_b_structlevv;
-			u8   hm2_b_structlevl;
+			u8   hm2$b_structlevv;
+			u8   hm2$b_structlevl;
 		} s1;
 	} u1;
-	u16		     hm2_w_cluster;
-	u16		     hm2_w_homevbn;
-	u16		     hm2_w_alhomevbn;
-	u16		     hm2_w_altidxvbn;
-	u16		     hm2_w_ibmapvbn;
-	u32		     hm2_l_ibmaplbn;
-	u32		     hm2_l_maxfiles;
-	u16		     hm2_w_ibmapsize;
-	u16		     hm2_w_resfiles;
-	u16		     hm2_w_devtype;
-	u16		     hm2_w_rvn;
-	u16		     hm2_w_setcount;
-	u16		     hm2_w_volchar;
+	u16		     hm2$w_cluster;
+	u16		     hm2$w_homevbn;
+	u16		     hm2$w_alhomevbn;
+	u16		     hm2$w_altidxvbn;
+	u16		     hm2$w_ibmapvbn;
+	u32		     hm2$l_ibmaplbn;
+	u32		     hm2$l_maxfiles;
+	u16		     hm2$w_ibmapsize;
+	u16		     hm2$w_resfiles;
+	u16		     hm2$w_devtype;
+	u16		     hm2$w_rvn;
+	u16		     hm2$w_setcount;
+	u16		     hm2$w_volchar;
 	union {
-		u32	     hm2_l_owner;
+		u32	     hm2$l_owner;
 		struct {
-			u16  hm2_w_mem;
-			u16  hm2_w_grp;
+			u16  hm2$w_mem;
+			u16  hm2$w_grp;
 		} s1;
 	} u2;
-	u32		     hm2_l_res1;
-	u16		     hm2_w_protect;
-	u16		     hm2_w_fileprot;
-	u16		     hm2_w_res2;
-	u16		     hm2_w_checksum1;
-	u32		     hm2_q_credate[2];
-	u8		     hm2_b_window;
-	u8		     hm2_b_lru_lim;
-	u16		     hm2_w_extend;
-	u32		     hm2_q_retainmin[2];
-	u32		     hm2_q_retainmax[2];
-	u32		     hm2_q_revdate[2];
-	u8		     hm2_r_min_class[20];
-	u8		     hm2_r_max_class[20];
-	u8		     hm2_b_res3[320];
-	u32		     hm2_l_serialnum;
-	char		     hm2_t_structname[12];
-	char		     hm2_t_volname[12];
-	char		     hm2_t_ownername[12];
-	char		     hm2_t_format[12];
-	u16		     hm2_w_res4;
-	u16		     hm2_w_checksum2;
+	u32		     hm2$l_res1;
+	u16		     hm2$w_protect;
+	u16		     hm2$w_fileprot;
+	u16		     hm2$w_res2;
+	u16		     hm2$w_checksum1;
+	u32		     hm2$q_credate[2];
+	u8		     hm2$b_window;
+	u8		     hm2$b_lru_lim;
+	u16		     hm2$w_extend;
+	u32		     hm2$q_retainmin[2];
+	u32		     hm2$q_retainmax[2];
+	u32		     hm2$q_revdate[2];
+	u8		     hm2$r_min_class[20];
+	u8		     hm2$r_max_class[20];
+	u8		     hm2$b_res3[320];
+	u32		     hm2$l_serialnum;
+	char		     hm2$t_structname[12];
+	char		     hm2$t_volname[12];
+	char		     hm2$t_ownername[12];
+	char		     hm2$t_format[12];
+	u16		     hm2$w_res4;
+	u16		     hm2$w_checksum2;
 } HM2DEF;
 
 /*
@@ -82,47 +86,47 @@ typedef struct hm2def {
 
 typedef struct scbdef {
 	union {
-		u16	     scb_w_struclev;
+		u16	     scb$w_struclev;
 		struct {
-			u8   scb_b_structlevv;
-			u8   scb_b_structlevl;
+			u8   scb$b_structlevv;
+			u8   scb$b_structlevl;
 		} s1;
 	} u1;
-	u16		     scb_w_cluster;
-	u32		     scb_l_volsize;
-	u32		     scb_l_blksize;
-	u32		     scb_l_sectors;
-	u32		     scb_l_tracks;
-	u32		     scb_l_cylinders;
+	u16		     scb$w_cluster;
+	u32		     scb$l_volsize;
+	u32		     scb$l_blksize;
+	u32		     scb$l_sectors;
+	u32		     scb$l_tracks;
+	u32		     scb$l_cylinders;
 	union {
-		u32	     scb_l_status;
+		u32	     scb$l_status;
 		struct {
-			u32  scb_v_mapdirty:1;
-			u32  scb_v_mapalloc:1;
-			u32  scb_v_filalloc:1;
-			u32  scb_v_quodirty:1;
-			u32  scb_v_hdrwrite:1;
-			u32  scb_v_corrupt:1;
+			u32  scb$v_mapdirty:1;
+			u32  scb$v_mapalloc:1;
+			u32  scb$v_filalloc:1;
+			u32  scb$v_quodirty:1;
+			u32  scb$v_hdrwrite:1;
+			u32  scb$v_corrupt:1;
 		} s1;
 	} u2;
 	union {
-		u32	     scb_l_status2;
+		u32	     scb$l_status2;
 		struct {
-			u32  scb_v_mapdirty:1;
-			u32  scb_v_mapalloc:1;
-			u32  scb_v_filalloc:1;
-			u32  scb_v_quodirty:1;
-			u32  scb_v_hdrwrite:1;
-			u32  scb_v_corrupt:1;
+			u32  scb$v_mapdirty:1;
+			u32  scb$v_mapalloc:1;
+			u32  scb$v_filalloc:1;
+			u32  scb$v_quodirty:1;
+			u32  scb$v_hdrwrite:1;
+			u32  scb$v_corrupt:1;
 		} s1;
 	} u3;
-	u16		     scb_w_writecnt;
-	char		     scb_t_volockname[12];
-	u16		     scb_q_mounttime[4];
-	u16		     scb_w_backrev;
-	u64		     scb_q_genernum;
-	u8		     scb_b_reserved[446];
-	u16		     scb_w_checksum;
+	u16		     scb$w_writecnt;
+	char		     scb$t_volockname[12];
+	u16		     scb$q_mounttime[4];
+	u16		     scb$w_backrev;
+	u64		     scb$q_genernum;
+	u8		     scb$b_reserved[446];
+	u16		     scb$w_checksum;
 } SCBDEF;
 
 /*
@@ -131,12 +135,12 @@ typedef struct scbdef {
 */
 
 typedef struct fi2def {
-	char		     fi2_t_filename[20];
-	u16		     fi2_w_revision;
-	u16		     fi2_q_credate[4];
-	u16		     fi2_q_revdate[4];
-	u16		     fi2_q_expdate[4];
-	u16		     fi2_q_bakdate[4];
+	char		     fi2$t_filename[20];
+	u16		     fi2$w_revision;
+	u16		     fi2$q_credate[4];
+	u16		     fi2$q_revdate[4];
+	u16		     fi2$q_expdate[4];
+	u16		     fi2$q_bakdate[4];
 	char		     fi_2_filenameext[66];
 } FI2DEF;
 
@@ -146,86 +150,86 @@ typedef struct fi2def {
 */
 
 typedef struct fh2def {
-	u8		     fh2_b_idoffset;
-	u8		     fh2_b_mpoffset;
-	u8		     fh2_b_acoffset;
-	u8		     fh2_b_rsoffset;
-	u16		     fh2_w_seg_num;
+	u8		     fh2$b_idoffset;
+	u8		     fh2$b_mpoffset;
+	u8		     fh2$b_acoffset;
+	u8		     fh2$b_rsoffset;
+	u16		     fh2$w_seg_num;
 	union {
-		u16	     fh2_w_struclev;
+		u16	     fh2$w_struclev;
 		struct {
-			u8   fh2_b_structlevv;
-			u8   fh2_b_structlevl;
+			u8   fh2$b_structlevv;
+			u8   fh2$b_structlevl;
 		} s1;
 	} u1;
 	union {
-		u16	     fh2_w_fid[3];
+		u16	     fh2$w_fid[3];
 		struct {
-			u16  fh2_w_fid_num;
-			u16  fh2_w_fid_seq;
-			u8   fh2_b_fid_rvn;
-			u8   fh2_b_fid_nmx;
+			u16  fh2$w_fid_num;
+			u16  fh2$w_fid_seq;
+			u8   fh2$b_fid_rvn;
+			u8   fh2$b_fid_nmx;
 		} s1;
 	} u2;
 	union {
-		u16	     fh2_w_ext_fid[3];
+		u16	     fh2$w_ext_fid[3];
 		struct {
-			u16  fid_w_ex_fidnum;
-			u16  fid_w_ex_fidseq;
-			u8   fid_b_ex_fidrvn;
-			u8   fid_b_ex_fidnmx;
+			u16  fid$w_ex_fidnum;
+			u16  fid$w_ex_fidseq;
+			u8   fid$b_ex_fidrvn;
+			u8   fid$b_ex_fidnmx;
 		} s1;
 	} u3;
-	u32		     fh2_w_recattr[8];
+	u32		     fh2$w_recattr[8];
 	union {
 		struct filechar {
-			u32  fch_v_wascontig:1;
-			u32  fch_v_nobackup:1;
-			u32  fch_v_writeback:1;
-			u32  fch_v_readcheck:1;
-			u32  fch_v_writecheck:1;
-			u32  fch_v_contigb:1;
-			u32  fch_v_locked:1;
-			u32  fch_v_contig:1;
-			u32  fch_v_res1:3;
-			u32  fch_v_badacl:1;
-			u32  fch_v_spool:1;
-			u32  fch_v_directory:1;
-			u32  fch_v_badblock:1;
-			u32  fch_v_markdel:1;
-			u32  fch_v_nocharge:1;
-			u32  fch_v_erase:1;
+			u32  fch$v_wascontig:1;
+			u32  fch$v_nobackup:1;
+			u32  fch$v_writeback:1;
+			u32  fch$v_readcheck:1;
+			u32  fch$v_writecheck:1;
+			u32  fch$v_contigb:1;
+			u32  fch$v_locked:1;
+			u32  fch$v_contig:1;
+			u32  fch$v_res1:3;
+			u32  fch$v_badacl:1;
+			u32  fch$v_spool:1;
+			u32  fch$v_directory:1;
+			u32  fch$v_badblock:1;
+			u32  fch$v_markdel:1;
+			u32  fch$v_nocharge:1;
+			u32  fch$v_erase:1;
 		} s1;
-		u32	     fh2_l_filechar;
+		u32	     fh2$l_filechar;
 	} u4;
-	u16		     fh2_w_res1;
-	u8		     fh2_b_map_inuse;
-	u8		     fh2_b_acc_mode;
+	u16		     fh2$w_res1;
+	u8		     fh2$b_map_inuse;
+	u8		     fh2$b_acc_mode;
 	union {
-		u32	     fh2_l_fileowner;
+		u32	     fh2$l_fileowner;
 		struct {
-			u16  fh2_w_mem;
-			u16  fh2_w_grp;
+			u16  fh2$w_mem;
+			u16  fh2$w_grp;
 		} s1;
 	} u5;
-	u16		     fh2_w_fileprot;
+	u16		     fh2$w_fileprot;
 	union {
-		u16	     fh2_w_backlink[3];
+		u16	     fh2$w_backlink[3];
 		struct {
-			u16  fid_w_num;
-			u16  fid_w_seq;
-			u8   fid_b_rvn;
-			u8   fid_b_nmx;
+			u16  fid$w_num;
+			u16  fid$w_seq;
+			u8   fid$b_rvn;
+			u8   fid$b_nmx;
 		} s1;
 	} u6;
-	u8		     fh2_b_journal;
-	u8		     fh2_b_ru_active;
-	u16		     fh2_w_res2;
-	u32		     fh2_l_highwater;
-	u8		     fh2_b_res3[8];
-	u8		     fh2_r_class_prot[20];
-	u8		     fh2_b_res4[402];
-	u16		     fh2_w_checksum;
+	u8		     fh2$b_journal;
+	u8		     fh2$b_ru_active;
+	u16		     fh2$w_res2;
+	u32		     fh2$l_highwater;
+	u8		     fh2$b_res3[8];
+	u8		     fh2$r_class_prot[20];
+	u8		     fh2$b_res4[402];
+	u16		     fh2$w_checksum;
 } FH2DEF;
 
 /*
@@ -234,57 +238,57 @@ typedef struct fh2def {
   It defines RMS attributes for any file.
 */
 
-#define FAT_C_UNDEFINED	 0
-#define FAT_C_FIXED	 1
-#define FAT_C_VARIABLE	 2
-#define FAT_C_VFC	 3
-#define FAT_C_STREAM	 4
-#define FAT_C_STREAMLF	 5
-#define FAT_C_STREAMCR	 6
+#define FAT$C_UNDEFINED	 0
+#define FAT$C_FIXED	 1
+#define FAT$C_VARIABLE	 2
+#define FAT$C_VFC	 3
+#define FAT$C_STREAM	 4
+#define FAT$C_STREAMLF	 5
+#define FAT$C_STREAMCR	 6
 
-#define FAT_C_SEQUANTIAL 0
-#define FAT_C_RELATIVE	 1
-#define FAT_C_INDEXED	 2
-#define FAT_C_DIRECT	 3
+#define FAT$C_SEQUANTIAL 0
+#define FAT$C_RELATIVE	 1
+#define FAT$C_INDEXED	 2
+#define FAT$C_DIRECT	 3
 
-#define FAT_M_FORTRANCC	 0x01
-#define FAT_M_IMPLIEDCC	 0x02
-#define FAT_M_PRINTCC	 0x04
-#define FAT_M_NOSPAN	 0x08
-#define FAT_M_MSBRCW	 0x10
+#define FAT$M_FORTRANCC	 0x01
+#define FAT$M_IMPLIEDCC	 0x02
+#define FAT$M_PRINTCC	 0x04
+#define FAT$M_NOSPAN	 0x08
+#define FAT$M_MSBRCW	 0x10
 
 typedef struct fatdef {
 	union {
-		u8	     fat_b_rtype;
+		u8	     fat$b_rtype;
 		struct {
-			u8   fat_v_rtype:4;
-			u8   fat_v_fileorg:4;
+			u8   fat$v_rtype:4;
+			u8   fat$v_fileorg:4;
 		} s0;
 	} u0;
-	u8		     fat_b_rattrib;
-	u8		     fat_w_rsize;
+	u8		     fat$b_rattrib;
+	u8		     fat$w_rsize;
 	union {
-		u32	     fat_l_hiblk;
+		u32	     fat$l_hiblk;
 		struct {
-			u16  fat_w_hiblkh;
-			u16  fat_w_hiblkl;
+			u16  fat$w_hiblkh;
+			u16  fat$w_hiblkl;
 		} s1;
 	} u1;
 	union {
-		u32	     fat_l_efblk;
+		u32	     fat$l_efblk;
 		struct {
-			u16  fat_w_efblkh;
-			u16  fat_w_efblkl;
+			u16  fat$w_efblkh;
+			u16  fat$w_efblkl;
 		} s1;
 	} u2;
-	u16		     fat_w_ffbyte;
-	u8		     fat_b_bktsize;
-	u8		     fat_b_vfcsize;
-	u16		     fat_w_maxrec;
-	u16		     fat_w_defext;
-	u8		     fat_b_res1[6];
-	u16		     fat_w_notused;
-	u16		     fat_w_versions;
+	u16		     fat$w_ffbyte;
+	u8		     fat$b_bktsize;
+	u8		     fat$b_vfcsize;
+	u16		     fat$w_maxrec;
+	u16		     fat$w_defext;
+	u8		     fat$b_res1[6];
+	u16		     fat$w_notused;
+	u16		     fat$w_versions;
 } FATDEF;
 
 /*
@@ -296,21 +300,21 @@ typedef struct fatdef {
 typedef struct fm2def {
 	union {
 		struct {
-			u8   fm2_b_count1;
-			u8   fm2_v_highlbn:6;
-			u8   fm2_v_format:2;
-			u16  fm2_w_lowlbn;
+			u8   fm2$b_count1;
+			u8   fm2$v_highlbn:6;
+			u8   fm2$v_format:2;
+			u16  fm2$w_lowlbn;
 		} fm1;
 		struct {
-			u16  fm2_v_count2:14;
-			u16  fm2_v_format:2;
-			u16  fm2_l_lbn2[2];
+			u16  fm2$v_count2:14;
+			u16  fm2$v_format:2;
+			u16  fm2$l_lbn2[2];
 		} fm2;
 		struct {
-			u16  fm2_v_count2:14;
-			u16  fm2_v_format:2;
-			u16  fm2_w_lowcount;
-			u32  fm2_l_lbn3;
+			u16  fm2$v_count2:14;
+			u16  fm2$v_format:2;
+			u16  fm2$w_lowcount;
+			u32  fm2$l_lbn3;
 		} fm3;
 	} u1;
 } FM2DEF;
@@ -319,35 +323,35 @@ typedef struct fm2def {
   This structure define a directory entry in a directory file.
 */
 
-#define DIR_C_FID	    0
-#define DIR_C_LINKNAME	    1
+#define DIR$C_FID	    0
+#define DIR$C_LINKNAME	    1
 
 typedef struct dirdef {
 	union {
 		struct {
-			u16  dir_w_size;
-			s16  dir_w_verlimit;
+			u16  dir$w_size;
+			s16  dir$w_verlimit;
 			union {
-				u8	dir_b_flags;
+				u8	dir$b_flags;
 				struct {
-					u8 dir_v_type:3;
-					u8 dir_v_res1:3;
-					u8 dir_v_nextrec:1;
-					u8 dir_v_prevrec:1;
+					u8 dir$v_type:3;
+					u8 dir$v_res1:3;
+					u8 dir$v_nextrec:1;
+					u8 dir$v_prevrec:1;
 				} s4;
 			} u4;
-			u8   dir_b_namecount;
-			char dir_t_name;
+			u8   dir$b_namecount;
+			char dir$t_name;
 		} s1;
 		struct {
-			u16	dir_w_version;
+			u16	dir$w_version;
 			union {
-				u16	dir_w_fid[3];
+				u16	dir$w_fid[3];
 				struct {
-					u16 fid_w_num;
-					u16 fid_w_seq;
-					u8  fid_b_rvn;
-					u8  fid_b_nmx;
+					u16 fid$w_num;
+					u16 fid$w_seq;
+					u8  fid$b_rvn;
+					u8  fid$b_nmx;
 				} s3;
 			} u2;
 		} s2;
@@ -449,36 +453,39 @@ typedef struct ods2fh {
   in memory.
 */
 
-#define SB_M_VERSALL	   0
-#define SB_M_VERSHIGH	   1
-#define SB_M_VERSNONE	   2
-#define SB_M_RAW	   8
-#define SB_M_LOWERCASE	   16
+#define SB$M_VERSALL	   0
+#define SB$M_VERSHIGH	   1
+#define SB$M_VERSNONE	   2
+#define SB$M_RAW	   8
+#define SB$M_LOWERCASE	   16
 
+#ifdef TWOSIX
+#define ODS2_SB(sb) (sb->s_fs_info)
+#else
 #define ODS2_SB(sb) ((struct ods2sb *)(sb->u.generic_sbp))
+#endif
 #define VMSSWAP(l) ((l & 0xffff) << 16 | l >> 16)
-#define FAT$C_SEQUENTIAL FAT_C_SEQUANTIAL
-#define FAT$C_FIXED FAT_C_FIXED
-#define fat$l_hiblk u1.fat_l_hiblk
-#define fat$l_efblk u2.fat_l_efblk
-#define fat$w_ffbyte fat_w_ffbyte
-#define fat$b_rtype u0.fat_b_rtype
-#define fat$w_maxrec fat_w_maxrec
-#define fat$w_versions fat_w_versions
-#define scb$l_volsize scb_l_volsize
-#define scb$w_cluster scb_w_cluster
-#define hm2$l_ibmaplbn hm2_l_ibmaplbn
-#define hm2$w_ibmapsize hm2_w_ibmapsize
-#define hm2$w_cluster hm2_w_cluster
-#define fh2$b_idoffset fh2_b_idoffset
-#define fh2$b_mpoffset fh2_b_mpoffset
-#define fh2$b_map_inuse fh2_b_map_inuse
-#define fh2$b_acoffset fh2_b_acoffset
-#define fh2$b_rsoffset fh2_b_rsoffset
-#define fh2$w_struclev u1.fh2_w_struclev
-#define fh2$w_checksum fh2_w_checksum
-#define fh2$w_fid_num u2.s1.fh2_w_fid_num
-#define fh2$w_fid_seq u2.s1.fh2_w_fid_seq
+#define FAT$C_SEQUENTIAL FAT$C_SEQUANTIAL
+#define fat$l_hiblk u1.fat$l_hiblk
+#define fat$l_efblk u2.fat$l_efblk
+#define fat$w_ffbyte fat$w_ffbyte
+#define fat$b_rtype u0.fat$b_rtype
+#define fat$w_maxrec fat$w_maxrec
+#define fat$w_versions fat$w_versions
+#define scb$l_volsize scb$l_volsize
+#define scb$w_cluster scb$w_cluster
+#define hm2$l_ibmaplbn hm2$l_ibmaplbn
+#define hm2$w_ibmapsize hm2$w_ibmapsize
+#define hm2$w_cluster hm2$w_cluster
+#define fh2$b_idoffset fh2$b_idoffset
+#define fh2$b_mpoffset fh2$b_mpoffset
+#define fh2$b_map_inuse fh2$b_map_inuse
+#define fh2$b_acoffset fh2$b_acoffset
+#define fh2$b_rsoffset fh2$b_rsoffset
+#define fh2$w_struclev u1.fh2$w_struclev
+#define fh2$w_checksum fh2$w_checksum
+#define fh2$w_fid_num u2.s1.fh2$w_fid_num
+#define fh2$w_fid_seq u2.s1.fh2$w_fid_seq
 
 #define SS$_NORMAL 1
 #define SS$_BADPARAM    0x0014
@@ -514,7 +521,11 @@ typedef struct ods2sb {
 	struct inode		 *indexf;  /* INDEXF.SYS */
 	u8			 *ibitmap; /* index file header bitmap */
 	struct buffer_head * sbh;
+#ifndef TWOSIX
 	struct statfs		  statfs;
+#else
+	struct kstatfs            statfs;
+#endif
 	struct {
 		int		  v_version:3; /* what to do with file versions */
 		int		  v_raw:1;     /* force all files as stream */
@@ -571,7 +582,12 @@ int parse_options(struct super_block *sb, char *options);
   inode.c
 */
 
-struct dentry *ods2_lookup(struct inode *dir, struct dentry *dentry);
+struct dentry *ods2_lookup(struct inode *dir, struct dentry *dentry
+#ifdef TWOSIX
+, struct nameidata *nd
+// but this is not used?
+#endif
+);
 void ods2_read_inode(struct inode *inode);
 void ods2_put_inode(struct inode *inode);
 void ods2_clear_inode(struct inode *inode);
@@ -596,7 +612,6 @@ int ods2_file_ioctl(struct inode *inode, struct file *filp, int unsigned cmd, lo
 ssize_t ods2_read(struct file *filp, char *buf, size_t buflen, loff_t *loff);
 loff_t ods2_llseek(struct file *filp, loff_t loff, int seek);
 int ods2_open_release(struct inode *inode, struct file *filp);
-
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

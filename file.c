@@ -15,16 +15,22 @@
  */
 
 #include <linux/config.h>
-/*
+#ifdef TWOSIX
 #include <linux/module.h>
-*/
+#endif
 #include <linux/string.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#ifndef TWOSIX
 #include <linux/locks.h>
+#endif
 #include <linux/blkdev.h>
+#ifndef TWOSIX
 #include <asm/uaccess.h>
+#else
+#include <linux/buffer_head.h>
+#endif
 
 #include "ods2.h"
 
@@ -61,7 +67,7 @@
 
 int ods2_file_ioctl(struct inode *inode, struct file *filp, int unsigned cmd, long unsigned arg) {
 	struct super_block	   *sb = inode->i_sb;
-	ODS2SB			   *ods2p = (ODS2SB *)sb->u.generic_sbp;
+	ODS2SB			   *ods2p = ODS2_SB(sb);
 	ODS2FILE		   *ods2filep = (ODS2FILE *)filp->private_data;
 	int			    error = -ENOTTY;
 	int			    onoff;
@@ -151,13 +157,13 @@ int update_virtual_file_pos(loff_t loff, ODS2VARI *ods2vari, u64 currec) {
 
   This routine take care of reading of variable record files.
   This routine will add a LF after each record if one of the following
-  record attributes are set: FAT_M_FORTRANCC, FAT_M_IMPLIEDCC, FAT_M_PRINTCC.
+  record attributes are set: FAT$M_FORTRANCC, FAT$M_IMPLIEDCC, FAT$M_PRINTCC.
 
   Note that a correct handling of all record structures should be able
   to handle form feed and insertion of more than one LF after each record.
   All this extra functionality must be handled outside of this driver.
 
-  It will also handle the FAT_M_NOSPAN. This attributes indicates that no
+  It will also handle the FAT$M_NOSPAN. This attributes indicates that no
   record must span between blocks. In each block a record with length
   65535 (-1) is inserted to indicate that there are no more records in the
   current block.
@@ -237,18 +243,18 @@ ssize_t ods2_read_variable(struct file *filp, char *buf, size_t buflen, loff_t *
 					up(&(ods2vari->sem));
 				}
 				
-				if ((ods2filep->reclen == 65535 && !(fatp->fat_b_rattrib & FAT_M_NOSPAN)) ||
+				if ((ods2filep->reclen == 65535 && !(fatp->fat$b_rattrib & FAT$M_NOSPAN)) ||
 				    (ods2filep->currec >= inode->i_size)) { /* end of records */
 					
 					ods2filep->reclen = 65535;
 					return (buf - buforg);
 				}
 
-				if (ods2filep->reclen == 65535 && (fatp->fat_b_rattrib & FAT_M_NOSPAN)) {
+				if (ods2filep->reclen == 65535 && (fatp->fat$b_rattrib & FAT$M_NOSPAN)) {
 					ods2filep->currec = (vbn + 1) * 512; /* could be a new record at next block */
 				} else {
 					ods2filep->curbyte = 2;
-					ods2filep->curbyte += (fatp->u0.s0.fat_v_rtype == FAT_C_VFC ? fatp->fat_b_vfcsize : 0);
+					ods2filep->curbyte += (fatp->u0.s0.fat$v_rtype == FAT$C_VFC ? fatp->fat$b_vfcsize : 0);
 				}
 			}
 		} while (((ods2filep->currec + ods2filep->curbyte) >> 9) != vbn);
@@ -267,7 +273,7 @@ ssize_t ods2_read_variable(struct file *filp, char *buf, size_t buflen, loff_t *
 		
 		if (ods2filep->curbyte - 2 == ods2filep->reclen) {
 			if (buflen > 0) {
-				if (fatp->fat_b_rattrib & FAT_M_FORTRANCC || fatp->fat_b_rattrib & FAT_M_IMPLIEDCC || fatp->fat_b_rattrib & FAT_M_PRINTCC) {
+				if (fatp->fat$b_rattrib & FAT$M_FORTRANCC || fatp->fat$b_rattrib & FAT$M_IMPLIEDCC || fatp->fat$b_rattrib & FAT$M_PRINTCC) {
 					buflen--;
 					*buf++ = '\n';
 					*loff += 1;
@@ -380,7 +386,7 @@ ssize_t ods2_read_stream(struct file *filp, char *buf, size_t buflen, loff_t *lo
 ssize_t ods2_read(struct file *filp, char *buf, size_t buflen, loff_t *loff) {
 	struct inode		   *inode = filp->f_dentry->d_inode;
 	struct super_block	   *sb = inode->i_sb;
-	ODS2SB			   *ods2p = (ODS2SB *)sb->u.generic_sbp;
+	ODS2SB			   *ods2p = ODS2_SB(sb);
 	ODS2FH			   *ods2fhp = (ODS2FH *)inode->u.generic_ip;
 	ODS2FILE		   *ods2filep = (ODS2FILE *)filp->private_data;
 	FATDEF			   *fatp = (FATDEF *)&(ods2fhp->fat);
@@ -389,15 +395,15 @@ ssize_t ods2_read(struct file *filp, char *buf, size_t buflen, loff_t *loff) {
 	if (ods2p->flags.v_raw || ods2filep->u1.s1.v_raw) {
 		return ods2_read_stream(filp, buf, buflen, loff);
 	} else {
-		switch (fatp->u0.s0.fat_v_fileorg) {
-		case FAT_C_SEQUANTIAL: {
-			switch (fatp->u0.s0.fat_v_rtype) {
-			case FAT_C_VFC:
-			case FAT_C_VARIABLE: return ods2_read_variable(filp, buf, buflen, loff);
-			case FAT_C_FIXED:
-			case FAT_C_STREAMLF:
-			case FAT_C_STREAMCR:
-			case FAT_C_STREAM: return ods2_read_stream(filp, buf, buflen, loff);
+		switch (fatp->u0.s0.fat$v_fileorg) {
+		case FAT$C_SEQUANTIAL: {
+			switch (fatp->u0.s0.fat$v_rtype) {
+			case FAT$C_VFC:
+			case FAT$C_VARIABLE: return ods2_read_variable(filp, buf, buflen, loff);
+			case FAT$C_FIXED:
+			case FAT$C_STREAMLF:
+			case FAT$C_STREAMCR:
+			case FAT$C_STREAM: return ods2_read_stream(filp, buf, buflen, loff);
 			default: return 0;
 			}
 		}
@@ -453,7 +459,10 @@ loff_t ods2_llseek_stream(struct file *filp, loff_t loff, int seek) {
 		}
 	}
 	filp->f_pos = offs;
+#ifndef TWOSIX
+// check this?
 	filp->f_reada = 0;
+#endif
 	filp->f_version++;
 	return offs;
 }
@@ -574,7 +583,10 @@ loff_t ods2_llseek_variable(struct file *filp, loff_t loff, int seek) {
 				ods2filep->reclen = 65535;
 				up(&(ods2vari->sem));
 				filp->f_pos = coffs;
+#ifndef TWOSIX
+// check this?
 				filp->f_reada = 0;
+#endif
 				filp->f_version++;
 				return offs;
 			}
@@ -584,31 +596,37 @@ loff_t ods2_llseek_variable(struct file *filp, loff_t loff, int seek) {
 				update_virtual_file_pos(coffs, ods2vari, currec);
 			}
 
-			if ((reclen == 65535 && !(fatp->fat_b_rattrib & FAT_M_NOSPAN)) || currec > inode->i_size) { /* end of records */
+			if ((reclen == 65535 && !(fatp->fat$b_rattrib & FAT$M_NOSPAN)) || currec > inode->i_size) { /* end of records */
 				ods2filep->reclen = 65535;
 				up(&(ods2vari->sem));
 				filp->f_pos = coffs;
+#ifndef TWOSIX
+// check this?
 				filp->f_reada = 0;
+#endif
 				filp->f_version++;
 				return offs;
 			}
-			if (reclen == 65535 && (fatp->fat_b_rattrib & FAT_M_NOSPAN)) {
+			if (reclen == 65535 && (fatp->fat$b_rattrib & FAT$M_NOSPAN)) {
 				currec = (vbn + 1) * 512; /* next block... */
 			}
 		} while (reclen == 65535);
 		
-		if (coffs <= offs && (coffs + reclen - (fatp->u0.s0.fat_v_rtype == FAT_C_VFC ? fatp->fat_b_vfcsize : 0)) >= offs) { /* we have found our location */
+		if (coffs <= offs && (coffs + reclen - (fatp->u0.s0.fat$v_rtype == FAT$C_VFC ? fatp->fat$b_vfcsize : 0)) >= offs) { /* we have found our location */
 			ods2filep->currec = currec;
-			ods2filep->curbyte = (offs - coffs) + 2 + (fatp->u0.s0.fat_v_rtype == FAT_C_VFC ? fatp->fat_b_vfcsize : 0);
+			ods2filep->curbyte = (offs - coffs) + 2 + (fatp->u0.s0.fat$v_rtype == FAT$C_VFC ? fatp->fat$b_vfcsize : 0);
 			ods2filep->reclen = reclen;
 			up(&(ods2vari->sem));
 			filp->f_pos = coffs;
+#ifndef TWOSIX
+// check this?
 			filp->f_reada = 0;
+#endif
 			filp->f_version++;
 			return offs;
 		}
-		coffs += (reclen - (fatp->u0.s0.fat_v_rtype == FAT_C_VFC ? fatp->fat_b_vfcsize : 0));
-		if (fatp->fat_b_rattrib & FAT_M_FORTRANCC || fatp->fat_b_rattrib & FAT_M_IMPLIEDCC || fatp->fat_b_rattrib & FAT_M_PRINTCC) {
+		coffs += (reclen - (fatp->u0.s0.fat$v_rtype == FAT$C_VFC ? fatp->fat$b_vfcsize : 0));
+		if (fatp->fat$b_rattrib & FAT$M_FORTRANCC || fatp->fat$b_rattrib & FAT$M_IMPLIEDCC || fatp->fat$b_rattrib & FAT$M_PRINTCC) {
 			coffs++; /* need to add one byte for LF */
 		}
 		currec = ((currec + reclen + 1) & ~1) + 2; /* all records are even aligned */
@@ -619,7 +637,7 @@ loff_t ods2_llseek_variable(struct file *filp, loff_t loff, int seek) {
 loff_t ods2_llseek(struct file *filp, loff_t loff, int seek) {
 	struct inode		   *inode = filp->f_dentry->d_inode;
 	struct super_block	   *sb = inode->i_sb;
-	ODS2SB			   *ods2p = (ODS2SB *)sb->u.generic_sbp;
+	ODS2SB			   *ods2p = ODS2_SB(sb);
 	ODS2FH			   *ods2fhp = (ODS2FH *)inode->u.generic_ip;
 	ODS2FILE		   *ods2filep = (ODS2FILE *)filp->private_data;
 	FATDEF			   *fatp = (FATDEF *)&(ods2fhp->fat);
@@ -627,15 +645,15 @@ loff_t ods2_llseek(struct file *filp, loff_t loff, int seek) {
 	if (ods2p->flags.v_raw || ods2filep->u1.s1.v_raw) {
 		return ods2_llseek_stream(filp, loff, seek);
 	} else {
-		switch (fatp->u0.s0.fat_v_fileorg) {
-		case FAT_C_SEQUANTIAL: {
-			switch (fatp->u0.s0.fat_v_rtype) {
-			case FAT_C_VFC:
-			case FAT_C_VARIABLE: return ods2_llseek_variable(filp, loff, seek);
-			case FAT_C_FIXED:
-			case FAT_C_STREAMLF:
-			case FAT_C_STREAMCR:
-			case FAT_C_STREAM: return ods2_llseek_stream(filp, loff, seek);
+		switch (fatp->u0.s0.fat$v_fileorg) {
+		case FAT$C_SEQUANTIAL: {
+			switch (fatp->u0.s0.fat$v_rtype) {
+			case FAT$C_VFC:
+			case FAT$C_VARIABLE: return ods2_llseek_variable(filp, loff, seek);
+			case FAT$C_FIXED:
+			case FAT$C_STREAMLF:
+			case FAT$C_STREAMCR:
+			case FAT$C_STREAM: return ods2_llseek_stream(filp, loff, seek);
 			default: return loff;
 			}
 		}

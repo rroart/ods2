@@ -12,20 +12,27 @@
  */
 
 #include <linux/config.h>
-/*
+#ifdef TWOSIX
 #include <linux/module.h>
-*/
+#endif
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#ifndef TWOSIX
 #include <linux/locks.h>
+#else
+#include <linux/buffer_head.h>
+#endif
 #include <linux/blkdev.h>
+#ifndef TWOSIX
 #include <asm/uaccess.h>
+#endif
 
 #include "ods2.h"
 
+#ifndef TWOSIX
 struct file_operations ods2_dir_operations = {
 	read:		NULL,
 	readdir:	ods2_readdir,
@@ -36,7 +43,6 @@ struct file_operations ods2_dir_operations = {
 	llseek:         generic_file_llseek,
 	mmap:           generic_file_mmap,
 };
-
 
 struct file_operations ods2_file_operations = {
 //	read:		ods2_read,
@@ -50,25 +56,63 @@ struct file_operations ods2_file_operations = {
 	fsync:		NULL,
 };
 
-
 struct inode_operations ods2_dir_inode_operations = {
 	create:		ods2_create,
 	lookup:		ods2_lookup,
 	link:		ods2_link,
 	unlink:		NULL,
 	symlink:	NULL,
-	mkdir:		NULL,
+	mkdir:		ods2_mkdir,
 	rmdir:		NULL,
 	mknod:		NULL,
 	rename:		NULL,
 };
+#else
+struct file_operations ods2_dir_operations = {
+	//.read=		NULL,
+	.readdir=	ods2_readdir,
+	.open=		ods2_open_release,
+	.release=	ods2_open_release,
+	//ioctl=		NULL,
+	//fsync=		NULL,
+	.llseek=         generic_file_llseek,
+	.mmap=           generic_file_mmap,
+};
 
+struct file_operations ods2_file_operations = {
+//	read=		ods2_read,
+	.read=          generic_file_read,
+	.write=          generic_file_write,
+	//readdir=	NULL,
+	.llseek=		ods2_llseek,
+	.open=		ods2_open_release,
+	.release=	ods2_open_release,
+	.ioctl=		ods2_file_ioctl,
+	//fsync=		NULL,
+};
 
+struct inode_operations ods2_dir_inode_operations = {
+	.create=		ods2_create,
+	.lookup=		ods2_lookup,
+	.link=		ods2_link,
+	//unlink=		NULL,
+	//symlink=	NULL,
+	.mkdir=		ods2_mkdir,
+	//rmdir=		NULL,
+	//mknod=		NULL,
+	//rename=		NULL,
+};
+#endif
 
-struct dentry *ods2_lookup(struct inode *dir, struct dentry *dentry)
+struct dentry *ods2_lookup(struct inode *dir, struct dentry *dentry
+#ifdef TWOSIX
+, struct nameidata *nd
+// but this is not used?
+#endif
+)
 {
 	struct super_block	   *sb = dir->i_sb;
-	ODS2SB			   *ods2p = (ODS2SB *)sb->u.generic_sbp;
+	ODS2SB			   *ods2p = ODS2_SB(sb);
 	struct buffer_head	   *bh = NULL;
 	char			   *vp;
 	u16     		   *rec;
@@ -107,14 +151,14 @@ struct dentry *ods2_lookup(struct inode *dir, struct dentry *dentry)
 		while (*rec != 65535 && *rec != 0) {
 			DIRDEF		       *dire = (DIRDEF *)rec;
 			
-			if (dire->u1.s1.dir_b_namecount == strlen(name)) {
-				char		      dirname[dire->u1.s1.dir_b_namecount + 1];
+			if (dire->u1.s1.dir$b_namecount == strlen(name)) {
+				char		      dirname[dire->u1.s1.dir$b_namecount + 1];
 				
-				memcpy(dirname, &dire->u1.s1.dir_t_name, dire->u1.s1.dir_b_namecount);
-				dirname[dire->u1.s1.dir_b_namecount] = 0;
+				memcpy(dirname, &dire->u1.s1.dir$t_name, dire->u1.s1.dir$b_namecount);
+				dirname[dire->u1.s1.dir$b_namecount] = 0;
 				if (ods2p->dollar != '$' || ods2p->flags.v_lowercase) {
 					char	       *p = dirname;
-					char		cnt = dire->u1.s1.dir_b_namecount;
+					char		cnt = dire->u1.s1.dir$b_namecount;
 					
 					while (*p && cnt-- > 0) { if (*p == '$') { *p = ods2p->dollar; } if (ods2p->flags.v_lowercase) { *p = tolower(*p); } p++; }
 				}
@@ -122,14 +166,14 @@ struct dentry *ods2_lookup(struct inode *dir, struct dentry *dentry)
 				if (strcmp(dirname, name) == 0) {
 					int		    curbyte = 0;
 					
-					while (curbyte < dire->u1.s1.dir_w_size) {
+					while (curbyte < dire->u1.s1.dir$w_size) {
 						u32		  ino;
-						DIRDEF		 *dirv = (DIRDEF *)((char *)dire + ((dire->u1.s1.dir_b_namecount + 1) & ~1) + 6 + curbyte);
+						DIRDEF		 *dirv = (DIRDEF *)((char *)dire + ((dire->u1.s1.dir$b_namecount + 1) & ~1) + 6 + curbyte);
 						
-						if (dirv->u1.s2.dir_w_version == vers || vers == 0) {
+						if (dirv->u1.s2.dir$w_version == vers || vers == 0) {
 							struct inode   *inode;
 							
-							ino = (dirv->u1.s2.u2.s3.fid_b_nmx << 16) | le16_to_cpu(dirv->u1.s2.u2.s3.fid_w_num);
+							ino = (dirv->u1.s2.u2.s3.fid$b_nmx << 16) | le16_to_cpu(dirv->u1.s2.u2.s3.fid$w_num);
 							brelse(bh);
 							if ((inode = iget(dir->i_sb, ino)) != NULL) {
 								d_add(dentry, inode);
@@ -142,7 +186,7 @@ struct dentry *ods2_lookup(struct inode *dir, struct dentry *dentry)
 					}
 				}
 			}
-			rec = (u16 *)((char *)rec + le16_to_cpu(dire->u1.s1.dir_w_size) + 2);
+			rec = (u16 *)((char *)rec + le16_to_cpu(dire->u1.s1.dir$w_size) + 2);
 		}
 		brelse(bh);
 		vbn++;
@@ -190,10 +234,17 @@ char unsigned vms2unixprot[] = {       /* ODS2 prot */
 static int ods2_get_block(struct inode *inode, long iblock, struct buffer_head *
 			  bh_result, int create);
 
+#ifdef TWOSIX
+static int ods2_writepage(struct page *page,void * wbc)
+{
+        return block_write_full_page(page,ods2_get_block,wbc);
+}
+#else
 static int ods2_writepage(struct page *page)
 {
         return block_write_full_page(page,ods2_get_block);
 }
+#endif
 static int ods2_readpage(struct file *file, struct page *page)
 {
         return block_read_full_page(page,ods2_get_block);
@@ -208,7 +259,9 @@ static int ods2_bmap(struct address_space *mapping, long block)
 }
 static int ods2_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsigned long blocknr, int blocksize)
 {
+#ifndef TWOSIX
         return generic_direct_IO(rw, inode, iobuf, blocknr, blocksize, ods2_get_block);
+#endif
 }
 
 struct address_space_operations ods2_aops = {
@@ -218,13 +271,15 @@ struct address_space_operations ods2_aops = {
         prepare_write: ods2_prepare_write,
         commit_write: generic_commit_write,
         bmap: ods2_bmap,
+#ifndef TWOSIX
         direct_IO: ods2_direct_IO,
+#endif
 };
 
 void ods2_read_inode(struct inode *inode) {
 	struct super_block	   *sb = inode->i_sb;
 	struct buffer_head	   *bh;
-	ODS2SB			   *ods2p = (ODS2SB *)sb->u.generic_sbp;
+	ODS2SB			   *ods2p = ODS2_SB(sb);
 	u32			    fhlbn;
 
 	if ((fhlbn = ino2fhlbn(sb, inode->i_ino)) > 0 &&
@@ -241,15 +296,15 @@ void ods2_read_inode(struct inode *inode) {
 			ods2fhp = (ODS2FH *)inode->u.generic_ip;
 			ods2fhp->map = NULL;
 			ods2fhp->ods2vari = NULL;
-			fi2p = (FI2DEF *)((short unsigned *)fh2p + fh2p->fh2_b_idoffset);
-			fatp = (FATDEF *)&(fh2p->fh2_w_recattr);
+			fi2p = (FI2DEF *)((short unsigned *)fh2p + fh2p->fh2$b_idoffset);
+			fatp = (FATDEF *)&(fh2p->fh2$w_recattr);
 
 			if (verify_fh(fh2p, inode->i_ino)) {
 
 				memcpy(&ods2fhp->fat, fatp, sizeof(FATDEF));
 				ods2fhp->map = getmap(sb, fh2p);
 
-				if (fh2p->u4.s1.fch_v_directory) {
+				if (fh2p->u4.s1.fch$v_directory) {
 					printk("read a dir\n");
 					inode->i_mode = S_IFDIR;
 					inode->i_op = &ods2_dir_inode_operations;
@@ -261,28 +316,30 @@ void ods2_read_inode(struct inode *inode) {
 					inode->i_mapping->a_ops = &ods2_aops;
 				}
 
-				inode->i_uid = le16_to_cpu(fh2p->u5.s1.fh2_w_mem);
-				inode->i_gid = le16_to_cpu(fh2p->u5.s1.fh2_w_grp);
-				
-				inode->i_ctime = vms2unixtime(fi2p->fi2_q_credate);
-				inode->i_mtime = vms2unixtime(fi2p->fi2_q_revdate);
-				inode->i_atime = vms2unixtime(fi2p->fi2_q_revdate);
+				inode->i_uid = le16_to_cpu(fh2p->u5.s1.fh2$w_mem);
+				inode->i_gid = le16_to_cpu(fh2p->u5.s1.fh2$w_grp);
+
+#ifndef TWOSIX				
+				inode->i_ctime = (long)vms2unixtime(fi2p->fi2$q_credate);
+				inode->i_mtime = (long)vms2unixtime(fi2p->fi2$q_revdate);
+				inode->i_atime = (long)vms2unixtime(fi2p->fi2$q_revdate);
+#endif
 				
 				/*
 				  Note that we don't use the system protection bits for ODS2.
 				*/
 				
-				inode->i_mode |= vms2unixprot[(le16_to_cpu(fh2p->fh2_w_fileprot) >> 4) & 0x0f] << 6; /* owner */
-				inode->i_mode |= vms2unixprot[(le16_to_cpu(fh2p->fh2_w_fileprot) >> 8) & 0x0f] << 3; /* group */
-				inode->i_mode |= vms2unixprot[(le16_to_cpu(fh2p->fh2_w_fileprot) >> 12) & 0x0f];     /* world => other */
+				inode->i_mode |= vms2unixprot[(le16_to_cpu(fh2p->fh2$w_fileprot) >> 4) & 0x0f] << 6; /* owner */
+				inode->i_mode |= vms2unixprot[(le16_to_cpu(fh2p->fh2$w_fileprot) >> 8) & 0x0f] << 3; /* group */
+				inode->i_mode |= vms2unixprot[(le16_to_cpu(fh2p->fh2$w_fileprot) >> 12) & 0x0f];     /* world => other */
 				
 				inode->i_blksize = 512;
-				inode->i_blocks = ((le16_to_cpu(fatp->u1.s1.fat_w_hiblkh) << 16) | le16_to_cpu(fatp->u1.s1.fat_w_hiblkl));
-				inode->i_size = ((le16_to_cpu(fatp->u2.s1.fat_w_efblkh) << 16) | le16_to_cpu(fatp->u2.s1.fat_w_efblkl)) << 9;
+				inode->i_blocks = ((le16_to_cpu(fatp->u1.s1.fat$w_hiblkh) << 16) | le16_to_cpu(fatp->u1.s1.fat$w_hiblkl));
+				inode->i_size = ((le16_to_cpu(fatp->u2.s1.fat$w_efblkh) << 16) | le16_to_cpu(fatp->u2.s1.fat$w_efblkl)) << 9;
 				if (inode->i_size > 0) { inode->i_size -= 512; }
-				inode->i_size += le16_to_cpu(fatp->fat_w_ffbyte);
+				inode->i_size += le16_to_cpu(fatp->fat$w_ffbyte);
 				
-				if ((fatp->u0.s0.fat_v_rtype == FAT_C_VFC || fatp->u0.s0.fat_v_rtype == FAT_C_VARIABLE) && !ods2p->flags.v_raw) {
+				if ((fatp->u0.s0.fat$v_rtype == FAT$C_VFC || fatp->u0.s0.fat$v_rtype == FAT$C_VARIABLE) && !ods2p->flags.v_raw) {
 					if ((ods2fhp->ods2vari = (ODS2VARI *)kmalloc(sizeof(ODS2VARI), GFP_KERNEL)) != NULL) {
 						memset(ods2fhp->ods2vari, 0 , sizeof(ODS2VARI));
 						sema_init(&(ods2fhp->ods2vari->sem), 1);
@@ -291,8 +348,12 @@ void ods2_read_inode(struct inode *inode) {
 					}
 				}
 				
-				ods2fhp->parent = (fh2p->u6.s1.fid_b_nmx << 16) |  le16_to_cpu(fh2p->u6.s1.fid_w_num);
+				ods2fhp->parent = (fh2p->u6.s1.fid$b_nmx << 16) |  le16_to_cpu(fh2p->u6.s1.fid$w_num);
+#ifndef TWOSIX
 				inode->i_version = ++event;
+#else
+				inode->i_version++; // suffices?
+#endif
 				bforget(bh);
 				return;
 			}
@@ -417,25 +478,28 @@ static int ods2_update_inode(struct inode * inode, int do_sync)
 	fh2p->fh2$b_rsoffset=0xff;
 	fh2p->fh2$w_struclev=0x201;
 	fh2p->fh2$w_fid_num=inode->i_ino;
-	fh2p->fh2$w_fid_seq=1;
-	fi2p = (FI2DEF *)((short unsigned *)fh2p + fh2p->fh2_b_idoffset);
-	fatp = (FATDEF *)&(fh2p->fh2_w_recattr);
+	if (inode->i_ino<10)
+		fh2p->fh2$w_fid_seq=inode->i_ino;
+	else
+		fh2p->fh2$w_fid_seq=1;
+	fi2p = (FI2DEF *)((short unsigned *)fh2p + fh2p->fh2$b_idoffset);
+	fatp = (FATDEF *)&(fh2p->fh2$w_recattr);
 
 	memcpy(fatp, &ods2fhp->fat, sizeof(FATDEF));
 	//ods2fhp->map = getmap(sb, fh2p);
 
 	if (inode->i_mode&S_IFDIR)
-		fh2p->u4.s1.fch_v_directory=1;
+		fh2p->u4.s1.fch$v_directory=1;
 	if (inode->i_mode&S_IFDIR)
 		printk("read a dir2\n");
 
-	fh2p->u5.s1.fh2_w_mem=cpu_to_le16(inode->i_uid);
-	fh2p->u5.s1.fh2_w_grp=cpu_to_le16(inode->i_gid);
+	fh2p->u5.s1.fh2$w_mem=cpu_to_le16(inode->i_uid);
+	fh2p->u5.s1.fh2$w_grp=cpu_to_le16(inode->i_gid);
 		
 #if 0		
-	fi2p->fi2_q_credate=unix2vmstime(inode->i_ctime);
-	fi2p->fi2_q_revdate=unix2vmstime(inode->i_mtime);
-	fi2p->fi2_q_revdate=unix2vmstime(inode->i_atime);
+	fi2p->fi2$q_credate=unix2vmstime(inode->i_ctime);
+	fi2p->fi2$q_revdate=unix2vmstime(inode->i_mtime);
+	fi2p->fi2$q_revdate=unix2vmstime(inode->i_atime);
 #endif
 				
 	/*
@@ -444,26 +508,33 @@ static int ods2_update_inode(struct inode * inode, int do_sync)
 
 #if 0
 // not yet				
-	inode->i_mode |= vms2unixprot[(le16_to_cpu(fh2p->fh2_w_fileprot) >> 4) & 0x0f] << 6; /* owner */
-	inode->i_mode |= vms2unixprot[(le16_to_cpu(fh2p->fh2_w_fileprot) >> 8) & 0x0f] << 3; /* group */
-	inode->i_mode |= vms2unixprot[(le16_to_cpu(fh2p->fh2_w_fileprot) >> 12) & 0x0f];     /* world => other */
+	inode->i_mode |= vms2unixprot[(le16_to_cpu(fh2p->fh2$w_fileprot) >> 4) & 0x0f] << 6; /* owner */
+	inode->i_mode |= vms2unixprot[(le16_to_cpu(fh2p->fh2$w_fileprot) >> 8) & 0x0f] << 3; /* group */
+	inode->i_mode |= vms2unixprot[(le16_to_cpu(fh2p->fh2$w_fileprot) >> 12) & 0x0f];     /* world => other */
 #endif		
 		
 	fatp->fat$w_maxrec = 512;
-	fatp->fat$b_rtype=(FAT$C_SEQUENTIAL << 4) | FAT$C_FIXED;
+	if(inode->i_mode&S_IFDIR)
+		fatp->fat$b_rtype=(FAT$C_SEQUENTIAL << 4) | FAT$C_VARIABLE;
+	else
+		fatp->fat$b_rtype=(FAT$C_SEQUENTIAL << 4) | FAT$C_FIXED;
 
 	fatp->fat$l_hiblk=VMSSWAP((1+inode->i_blocks));
 	fatp->fat$l_efblk=VMSSWAP((1+inode->i_size/512));
 	fatp->fat$w_ffbyte=inode->i_size%512;
+	// todo/remember: if dir and ffbyte = 0 efblk is one less
+	// also for dir, set m_contig, but somewhere else?
+
+	fh2p->fh2$l_highwater=VMSSWAP((1+inode->i_blocks)); // check. set this?
 
 #if 0
-	inode->i_blocks = ((le16_to_cpu(fatp->u1.s1.fat_w_hiblkh) << 16) | le16_to_cpu(fatp->u1.s1.fat_w_hiblkl));
-	inode->i_size = ((le16_to_cpu(fatp->u2.s1.fat_w_efblkh) << 16) | le16_to_cpu(fatp->u2.s1.fat_w_efblkl)) << 9;
+	inode->i_blocks = ((le16_to_cpu(fatp->u1.s1.fat$w_hiblkh) << 16) | le16_to_cpu(fatp->u1.s1.fat$w_hiblkl));
+	inode->i_size = ((le16_to_cpu(fatp->u2.s1.fat$w_efblkh) << 16) | le16_to_cpu(fatp->u2.s1.fat$w_efblkl)) << 9;
 	if (inode->i_size > 0) { inode->i_size -= 512; }
 #endif
 	fatp->fat$w_versions=1;
 				
-	ods2fhp->parent = (fh2p->u6.s1.fid_b_nmx << 16) |  le16_to_cpu(fh2p->u6.s1.fid_w_num);
+	ods2fhp->parent = (fh2p->u6.s1.fid$b_nmx << 16) |  le16_to_cpu(fh2p->u6.s1.fid$w_num);
 
 	fh2p->fh2$w_checksum = VMSWORD(checksum(fh2p));
 
@@ -476,7 +547,7 @@ static int ods2_update_inode(struct inode * inode, int do_sync)
 		if (buffer_req(bh) && !buffer_uptodate(bh)) {
 			printk ("IO error syncing ods2 inode ["
 				"%s:%08lx]\n",
-				bdevname(inode->i_dev), inode->i_ino);
+				0, inode->i_ino);
 			err = -EIO;
 		}
 	}
@@ -531,47 +602,50 @@ static inline void ods2_dec_count(struct inode *inode)
  */
 int ods2_make_empty(struct inode *inode, struct inode *parent)
 {
-	panic("not yet\n");
-#if 0
-	short buf[256];
+	ODS2FH                   *ods2fhp=(ODS2FH *)inode->u.generic_ip;
+	int lbn;// = vbn2lbn(inode->i_sb, ods2fhp->map, 1);
+	struct buffer_head * bh;
+	short * buf;
+
+	struct address_space *mapping = inode->i_mapping;
+        struct page *page = grab_cache_page(mapping, 0);
+
+	int err;
+
+        if (!page)
+                return -ENOMEM;
+        err = mapping->a_ops->prepare_write(NULL, page, 0, 512);
+        if (err)
+                goto fail;
+
+        buf = page_address(page);
 
 	memset(buf, 0, 512);
 	buf[0]=0xffff;
 
+	struct inode *dir = page->mapping->host;
+	page->mapping->a_ops->commit_write(NULL, page, 0, 512);
+        if (IS_SYNC(dir)) {
+                int err2;
+#ifdef TWOSIX
+                err = write_one_page(page, 1);
+#else
+                err = writeout_one_page(page);
+                err2 = waitfor_one_page(page);
+                if (err == 0)
+                        err = err2;
+#endif
+        }
 
-	int err=0;
-
-	struct page     *page, *cached_page = 0;
-	struct address_space *mapping = inode->i_mapping;
-
-
-	page = __grab_cache_page(mapping, index, &cached_page);
-	if (!page)
-		break;
-
-	/* We have exclusive IO access to the page.. */
-	if (!PageLocked(page)) {
-		PAGE_BUG(page);
-	}
-
-	kaddr = kmap(page);
-	status = mapping->a_ops->prepare_write(file, page, offset, offs\
-					       et+bytes);
-	if (status)
-		goto sync_failure;
-	page_fault = __copy_from_user(kaddr+offset, buf, bytes);
-	flush_dcache_page(page);
-	status = mapping->a_ops->commit_write(file, page, offset, offse\
-					      t+bytes);
-
-
-
-	if (err)
-		goto fail;
 
 fail:
-	return err;
+#ifndef TWOSIX
+        UnlockPage(page);
+#else
+	unlock_page(page);
 #endif
+        page_cache_release(page);
+        return err;
 }
 
 static int ods2_get_block(struct inode *inode, long iblock, struct buffer_head *
@@ -590,7 +664,11 @@ static int ods2_get_block(struct inode *inode, long iblock, struct buffer_head *
 	lbn = vbn2lbn(sb, ods2fhp->map, vbn+1);
 
 	if (lbn > 0) {
+#ifndef TWOSIX
 		bh_result->b_dev = inode->i_dev;
+#else
+		bh_result->b_bdev = inode->i_bdev;
+#endif
                 bh_result->b_blocknr = lbn;
                 bh_result->b_state |= (1UL << BH_Mapped);
 		return 0;
@@ -637,7 +715,11 @@ static int ods2_get_block(struct inode *inode, long iblock, struct buffer_head *
 
  map_set:
 
+#ifndef TWOSIX
 	bh_result->b_dev = inode->i_dev;
+#else
+	bh_result->b_bdev = inode->i_bdev;
+#endif
 	bh_result->b_blocknr = lbn;
 	bh_result->b_state |= (1UL << BH_New) | (1UL << BH_Mapped);
 	return 0;
@@ -693,6 +775,7 @@ out:
 	return err;
 
 out_fail:
+	printk("Ods2 make empty dir failed\n");
 	ods2_dec_count(inode);
 	ods2_dec_count(inode);
 	iput(inode);

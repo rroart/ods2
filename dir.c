@@ -15,17 +15,23 @@
  */
 
 #include <linux/config.h>
-/*
+#ifdef TWOSIX
 #include <linux/module.h>
-*/
+#endif
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#ifndef TWOSIX
 #include <linux/locks.h>
+#endif
 #include <linux/blkdev.h>
+#ifndef TWOSIX
 #include <asm/uaccess.h>
+#else
+#include <linux/buffer_head.h>
+#endif
 
 #include "ods2.h"
 
@@ -39,7 +45,7 @@ int ods2_readdir(struct file *filp, void *dirent, filldir_t filldir) {
 	struct inode		   *inode = filp->f_dentry->d_inode;
 	struct super_block	   *sb = inode->i_sb;
 	struct buffer_head	   *bh = NULL;
-	ODS2SB			   *ods2p = (ODS2SB *)sb->u.generic_sbp;
+	ODS2SB			   *ods2p = ODS2_SB(sb);
 	ODS2FH			   *ods2fhp = (ODS2FH *)inode->u.generic_ip;
 	ODS2FILE		   *ods2filep = (ODS2FILE *)filp->private_data;
 	loff_t			    pos = filp->f_pos;
@@ -90,31 +96,31 @@ int ods2_readdir(struct file *filp, void *dirent, filldir_t filldir) {
 		
 		while (*recp != 65535 && *recp <= 512 && ods2filep->currec < inode->i_size) {
 			DIRDEF	   *dire = (DIRDEF *)recp;
-			char	    dirname[dire->u1.s1.dir_b_namecount + 1];
+			char	    dirname[dire->u1.s1.dir$b_namecount + 1];
 			
-			memcpy(dirname, &dire->u1.s1.dir_t_name, dire->u1.s1.dir_b_namecount);
-			dirname[dire->u1.s1.dir_b_namecount] = 0;
+			memcpy(dirname, &dire->u1.s1.dir$t_name, dire->u1.s1.dir$b_namecount);
+			dirname[dire->u1.s1.dir$b_namecount] = 0;
 			if (ods2p->dollar != '$' || ods2p->flags.v_lowercase) {
 				char	       *p = dirname;
-				char		cnt = dire->u1.s1.dir_b_namecount;
+				char		cnt = dire->u1.s1.dir$b_namecount;
 
 				while (*p && cnt-- > 0) { if (*p == '$') { *p = ods2p->dollar; } if (ods2p->flags.v_lowercase) { *p = tolower(*p); } p++; }
 			}
-			if (ods2filep->curbyte == 0) { ods2filep->curbyte = ((dire->u1.s1.dir_b_namecount + 1) & ~1) + 6; }
+			if (ods2filep->curbyte == 0) { ods2filep->curbyte = ((dire->u1.s1.dir$b_namecount + 1) & ~1) + 6; }
 			filp->f_pos = ods2filep->currec + ods2filep->curbyte;
 			
-			while (ods2filep->curbyte < dire->u1.s1.dir_w_size &&
-			       !(ods2p->flags.v_version != SB_M_VERSALL && strlen(dirname) == strlen(cdirname) && strncmp(dirname, cdirname, strlen(dirname)) == 0)) {
+			while (ods2filep->curbyte < dire->u1.s1.dir$w_size &&
+			       !(ods2p->flags.v_version != SB$M_VERSALL && strlen(dirname) == strlen(cdirname) && strncmp(dirname, cdirname, strlen(dirname)) == 0)) {
 
 				DIRDEF		     *dirv = (DIRDEF *)((char *)dire + ods2filep->curbyte);
-				u32		      ino = (dirv->u1.s2.u2.s3.fid_b_nmx << 16) | le16_to_cpu(dirv->u1.s2.u2.s3.fid_w_num);
-				char		      dirnamev[dire->u1.s1.dir_b_namecount + 1 + 5 + 1];
+				u32		      ino = (dirv->u1.s2.u2.s3.fid$b_nmx << 16) | le16_to_cpu(dirv->u1.s2.u2.s3.fid$w_num);
+				char		      dirnamev[dire->u1.s1.dir$b_namecount + 1 + 5 + 1];
 				
 				if (ino != 4) { /* we must ignore 000000.DIR as it is the same as . */
-					if (ods2p->flags.v_version == SB_M_VERSNONE) {
+					if (ods2p->flags.v_version == SB$M_VERSNONE) {
 						sprintf(dirnamev, "%s", dirname);
 					} else {
-						sprintf(dirnamev, "%s%c%d", dirname, ods2p->semicolon, dirv->u1.s2.dir_w_version);
+						sprintf(dirnamev, "%s%c%d", dirname, ods2p->semicolon, dirv->u1.s2.dir$w_version);
 					}
 
 					/*
@@ -126,7 +132,7 @@ int ods2_readdir(struct file *filp, void *dirent, filldir_t filldir) {
 					*/
 
 					if (filldir(dirent, dirnamev, strlen(dirnamev), filp->f_pos, ino, 
-						    (strstr(dirnamev, (ods2p->flags.v_lowercase ? ".dir." : ".DIR")) == NULL ? DT_REG : DT_DIR))) {
+						    (my_strstr(dirnamev, (ods2p->flags.v_lowercase ? ".dir." : ".DIR")) == NULL ? DT_REG : DT_DIR))) {
 						/*
 						  We come here when filldir is unable to handle more entries.
 						*/
@@ -134,14 +140,14 @@ int ods2_readdir(struct file *filp, void *dirent, filldir_t filldir) {
 						brelse(bh);
 						return 0;
 					}
-					if (ods2p->flags.v_version != SB_M_VERSALL) { strcpy(cdirname, dirname); }
+					if (ods2p->flags.v_version != SB$M_VERSALL) { strcpy(cdirname, dirname); }
 				}
-				if (ods2p->flags.v_version == SB_M_VERSALL) {
+				if (ods2p->flags.v_version == SB$M_VERSALL) {
 					ods2filep->curbyte += 8;
 					filp->f_pos += 8;
 				} else {
-					ods2filep->curbyte = le16_to_cpu(dire->u1.s1.dir_w_size);
-					filp->f_pos += dire->u1.s1.dir_w_size;
+					ods2filep->curbyte = le16_to_cpu(dire->u1.s1.dir$w_size);
+					filp->f_pos += dire->u1.s1.dir$w_size;
 				}
 			}
 			
@@ -152,8 +158,8 @@ int ods2_readdir(struct file *filp, void *dirent, filldir_t filldir) {
 			*/
 			
 			ods2filep->curbyte = 0;
-			ods2filep->currec += le16_to_cpu(dire->u1.s1.dir_w_size) + 2;
-			recp = (u16 *)((char *)recp + le16_to_cpu(dire->u1.s1.dir_w_size) + 2);
+			ods2filep->currec += le16_to_cpu(dire->u1.s1.dir$w_size) + 2;
+			recp = (u16 *)((char *)recp + le16_to_cpu(dire->u1.s1.dir$w_size) + 2);
 		}
 		
 		/*
@@ -464,6 +470,18 @@ void fid_copy(struct _fiddef *dst,struct _fiddef *src,unsigned rvn)
 	dst->fid$b_nmx = src->fid$b_nmx;
 }
 
+// temp workaround for cases when dir file is all zeroes
+zero_check_and_set(short * buffer) {
+	int i,j=0;
+	for (i=0;i<256;i++)
+		j+=buffer[i];
+	if (j)
+		return;
+	memset(buffer, 0, 512);
+	buffer[0]=0xffff;
+	printk("zero_check_and_set done\n");
+}
+
 /* insert_ent() - procedure to add a directory entry at record dr entry de */
 
 unsigned insert_ent(struct inode * inode,unsigned eofblk,unsigned curblk,
@@ -478,6 +496,7 @@ unsigned insert_ent(struct inode * inode,unsigned eofblk,unsigned curblk,
     struct super_block * sb = inode->i_sb;
     ODS2FH                     *ods2fhp = (ODS2FH *)inode->u.generic_ip;
 
+    zero_check_and_set(buffer);
     //printk("insert ent %x %x %x %x %x %x %s %x %x %x\n",inode,eofblk,curblk,buffer,dr,de,filename,filelen,version,fid);
     int i;
     //for(i=0;i<32;i++) printk("%c %x \n",buffer[i],(unsigned char)buffer[i]);
@@ -499,9 +518,11 @@ unsigned insert_ent(struct inode * inode,unsigned eofblk,unsigned curblk,
             struct _dir *nr = (struct _dir *) (buffer + inuse);
             if (dr == nr) invalid_dr = 0;
             sizecheck = VMSWORD(nr->dir$w_size);
+	    //printk("sizec %x\n",sizecheck);
             if (sizecheck == 0xffff || sizecheck == 0xffffffff) // check. did not need 0xffffffff before
                 break;
             sizecheck += 2;
+	    //printk("sizec %x %s\n",sizecheck,nr->dir$t_name);
             inuse += sizecheck;
             sizecheck -= (nr->dir$b_namecount + STRUCT_DIR_SIZE) & ~1;
             if (inuse > MAXREC || (inuse & 1) || sizecheck <= 0 ||
@@ -625,6 +646,7 @@ unsigned insert_ent(struct inode * inode,unsigned eofblk,unsigned curblk,
 
     /* Write the entry values are we are done! */
 
+    memset(de, 0, 2); // next line only sets a byte, so therefore workaround
     de->dir$w_version = VMSWORD(version);
     fid_copy(&de->dir$fid,fid,0);
     mark_inode_dirty(inode);
@@ -767,6 +789,7 @@ unsigned search_ent(struct inode * inode,
     } else {
         unsigned loblk = 1,hiblk = eofblk;
         if (curblk < 1 || curblk > eofblk) curblk = (eofblk + 1) / 2;
+	//printk("lh %x %x %x %x\n",loblk,hiblk,curblk,fib->fib$l_wcc);
         while (loblk < hiblk) {
             int cmp;
             unsigned newblk;
@@ -775,12 +798,14 @@ unsigned search_ent(struct inode * inode,
 	    sts = 1;
 	    bh = sb_bread (sb, vbn2lbn(sb, ods2fhp->map, curblk));
 	    buffer = bh->b_data;
+	    //for (cmp=0;cmp<32;cmp++)printk("%c %x ",(unsigned char)buffer[cmp],(unsigned char)buffer[cmp]);
             if ((sts & 1) == 0) return sts;
             dr = (struct _dir *) buffer;
             if (VMSWORD(dr->dir$w_size) > MAXREC) {
                 cmp = MAT_GT;
             } else {
                 cmp = name_match(searchspec,searchlen,dr->dir$t_name,dr->dir$b_namecount);
+		//printk("cmp %x %x %x\n",cmp,version,curblk);
                 if (cmp == MAT_EQ) {
                     if (wildcard || version < 1 || version > 32767) {
                         cmp = MAT_NE;   /* no match - want to find start */
@@ -797,6 +822,7 @@ unsigned search_ent(struct inode * inode,
                     }
                 }
             }
+	    //printk("cmp2 %x %x %x %x %x\n",cmp,newblk,hiblk,loblk,curblk);
             switch (cmp) {
                 case MAT_LT:
                     if (curblk == fib->fib$l_wcc) {
@@ -814,6 +840,7 @@ unsigned search_ent(struct inode * inode,
                 default:
                     newblk = hiblk = loblk = curblk;
             }
+	    //printk("cmp3 %x %x %x %x %x\n",cmp,newblk,hiblk,loblk,curblk);
             if (newblk != curblk) {
                 curblk = newblk;
             }
@@ -1015,8 +1042,9 @@ int ods2_add_link (struct dentry *dentry, struct inode *inode)
 	fib.fib$b_fid_rvn = 0;
 	fib.fib$l_wcc = 0;
 
-	//printk("isi %x %x\n",dentry->d_parent->d_inode->i_size,dentry->d_parent->d_inode->i_blocks);
-	int sts = search_ent(dentry->d_parent->d_inode,&fibdsc,&filedsc,&reslen,&resdsc,dentry->d_parent->d_inode->i_blocks,2);
+	//printk("isi %x %x %x %x %x %x\n",dentry->d_parent->d_inode->i_size,dentry->d_parent->d_inode->i_blocks,dentry->d_parent->d_inode->i_blocks,dentry->d_parent->d_inode->i_blocks,dentry->d_parent->d_inode->i_size);
+	int eofblk=/*1+*/(dentry->d_parent->d_inode->i_size>>9);
+	int sts = search_ent(dentry->d_parent->d_inode,&fibdsc,&filedsc,&reslen,&resdsc,eofblk,2);
 	//printk("search ent %x\n",sts);
 out:
 	return err;
