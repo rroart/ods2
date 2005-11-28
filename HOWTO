@@ -1,0 +1,15 @@
+For 2.6:
+
+Add a line
+obj-$(CONFIG_ODS2_FS)          += ods2/
+at the end of fs/Makefile
+
+Add the lines
+config ODS2_FS
+       tristate "x"
+to somewhere early enough in fs/Kconfig
+
+Move the ods2 directory to fs/
+
+Do make menuconfig, go to filesystems and choose the x
+

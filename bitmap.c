@@ -2,17 +2,23 @@
 // Author. Roar Thronæs.
 
 #include <linux/config.h>
-/*
+#ifdef TWOSIX
 #include <linux/module.h>
-*/
+#endif
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#ifndef TWOSIX
 #include <linux/locks.h>
+#endif
 #include <linux/blkdev.h>
+#ifndef TWOSIX
 #include <asm/uaccess.h>
+#else
+#include <linux/buffer_head.h>
+#endif
 
 #include "ods2.h"
 
@@ -63,9 +69,13 @@ repeat:
 	inode->i_blocks = 0;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 	insert_inode_hash(inode);
+#ifndef TWOSIX
 	inode->i_generation = event++;
-
+#else
+	inode->i_generation++; //suffices?
+#endif
 	inode->u.generic_ip = kmalloc(sizeof(ODS2FH), GFP_KERNEL);
+	memset(inode->u.generic_ip, 0, sizeof(ODS2FH));
 	ODS2FH                 *ods2fhp;
 	FI2DEF                 *fi2p;
 	FATDEF                 *fatp;
@@ -83,6 +93,10 @@ repeat:
 	fatp->fat$l_hiblk=VMSSWAP((1));
 	fatp->fat$l_efblk=VMSSWAP((1));
 	fatp->fat$w_ffbyte=0;
+
+#ifdef TWOSIX
+	inode->i_bdev=sb->s_bdev;
+#endif
 
 	mark_inode_dirty(inode);
 
@@ -121,14 +135,15 @@ unsigned bitmap_search(struct super_block * sb,unsigned *position,unsigned *coun
     ODS2SB * ods2p = ODS2_SB(sb);
     struct hm2def * hm2 = ods2p->hm2;
     needed = *count;
-    if (needed < 1 || needed > (ods2p->statfs.f_blocks/hm2->hm2$w_cluster) + 1) return SS$_BADPARAM;
+    // why do I have to cast to long when sector_t is long in 2.6, too? 
+    if (needed < 1 || needed > (((long)ods2p->statfs.f_blocks)/hm2->hm2$w_cluster) + 1) return SS$_BADPARAM;
     cluster = *position;
-    if (cluster + *count > (ods2p->statfs.f_blocks/hm2->hm2$w_cluster) + 1) cluster = 0;
+    if (cluster + *count > (((long)ods2p->statfs.f_blocks)/hm2->hm2$w_cluster) + 1) cluster = 0;
     map_block = cluster / 4096 + 2;
     block_offset = cluster % 4096;
     cluster = cluster - (cluster % WORK_BITS);
     ret_cluster = cluster;
-    search_words = (ods2p->statfs.f_blocks/hm2->hm2$w_cluster) / WORK_BITS;
+    search_words = (((long)ods2p->statfs.f_blocks)/hm2->hm2$w_cluster) / WORK_BITS;
     do {
         unsigned blkcount;
         WORK_UNIT *bitmap;
@@ -220,7 +235,7 @@ unsigned bitmap_modify(struct super_block * sb,unsigned cluster,unsigned count,
     ODS2SB * ods2p = ODS2_SB(sb);
     struct hm2def * hm2 = ods2p->hm2;
     if (clust_count < 1) return SS$_BADPARAM;
-    if (cluster + clust_count > (ods2p->statfs.f_blocks/hm2->hm2$w_cluster) + 1) return SS$_BADPARAM;
+    if (cluster + clust_count > (((long)ods2p->statfs.f_blocks)/hm2->hm2$w_cluster) + 1) return SS$_BADPARAM;
     do {
         unsigned blkcount;
         WORK_UNIT *bitmap;
