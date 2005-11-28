@@ -58,6 +58,39 @@ repeat:
 
 	ino = i + 1;
 
+	int lbn = ino2fhlbn(sb, ino);
+
+	printk("TEST ino lbn %x %x\n",ino,lbn);
+
+	if (lbn == 0) {
+	  int sts;
+	  unsigned start_pos = 0;
+	  unsigned block_count = 1*20;
+	  sts = bitmap_search(sb, &start_pos, &block_count);
+	  bitmap_modify(sb, start_pos, 1*20, 0);
+	  struct buffer_head * bh = sb_bread(sb, ods2p->hm2->hm2$l_ibmaplbn+ods2p->hm2->hm2$w_ibmapsize);
+	  FH2DEF * head = bh->b_data;
+	  unsigned short *mp,*map;
+	  map = mp = (unsigned short *) head + head->fh2$b_mpoffset + head->fh2$b_map_inuse;
+	  *mp++ = (3 << 14) | ((block_count *ods2p->hm2->hm2$w_cluster - 1) >> 16);
+	  *mp++ = (block_count * ods2p->hm2->hm2$w_cluster - 1) & 0xffff;
+	  *mp++ = (start_pos * ods2p->hm2->hm2$w_cluster) & 0xffff;
+	  *mp++ = (start_pos * ods2p->hm2->hm2$w_cluster) >> 16;
+	  head->fh2$b_map_inuse += 4;
+	  ODS2SB *ods2p = ODS2_SB(sb);
+	  ODS2FH *ods2fhp = (ODS2FH *)ods2p->indexf->u.generic_ip;
+	  void * oldmap = ods2fhp->map;
+	  ods2fhp->map = getmap(sb, head); // fix addmap later
+	  kfree(oldmap);
+	  //head2 = f11b_read_header (xqp->current_vcb, 0, fcb, &iosb);
+	  //sts=iosb.iosb$w_status;
+	  // not this? head->fh2$w_recattr.fat$l_hiblk = VMSSWAP(fcb->fcb$l_efblk * ods2p->hm2->hm2$w_cluster);
+	  if (head->fh2$l_highwater)
+	    head->fh2$l_highwater += block_count * ods2p->hm2->hm2$w_cluster;;
+	  head->fh2$w_checksum = VMSWORD(checksum(head));
+	  mark_buffer_dirty(bh);
+	}
+
 	mark_buffer_dirty(ods2p->bh);
 	sb->s_dirt = 1;
 	inode->i_uid = current->fsuid;
