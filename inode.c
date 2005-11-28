@@ -30,6 +30,10 @@
 #include <asm/uaccess.h>
 #endif
 
+#ifndef TWOSIX
+typedef long sector_t
+#endif
+
 #include "ods2.h"
 
 #ifndef TWOSIX
@@ -231,7 +235,7 @@ char unsigned vms2unixprot[] = {       /* ODS2 prot */
 	    0	|     0	  |	0   ,	/*	   */
 };
 
-static int ods2_get_block(struct inode *inode, long iblock, struct buffer_head *
+static int ods2_get_block(struct inode *inode, sector_t iblock, struct buffer_head *
 			  bh_result, int create);
 
 #ifdef TWOSIX
@@ -253,7 +257,7 @@ static int ods2_prepare_write(struct file *file, struct page *page, unsigned fro
 {
         return block_prepare_write(page,from,to,ods2_get_block);
 }
-static int ods2_bmap(struct address_space *mapping, long block)
+static int ods2_bmap(struct address_space *mapping, sector_t block)
 {
         return generic_block_bmap(mapping,block,ods2_get_block);
 }
@@ -648,7 +652,7 @@ fail:
         return err;
 }
 
-static int ods2_get_block(struct inode *inode, long iblock, struct buffer_head *
+static int ods2_get_block(struct inode *inode, sector_t iblock, struct buffer_head *
 			  bh_result, int create)
 {
 	int lbn;
