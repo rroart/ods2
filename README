@@ -1,0 +1,42 @@
+Overview
+========
+
+The ODS2 driver for Linux version 0.9.2 support read of ODS2 formated
+file systems such as SCSI disks, CDROM's, container disks that have been
+formatted using OpenVMS.
+Currently only stream and variable record files are supported.
+
+
+Limitations and workarounds
+===========================
+
+The nature of variable record files make it hard for utilities like less
+to find the correct end. The less utility assume that the file size is the
+true end of the last byte of data in the file but for a variable record
+file the file size also include bytes not to be displayed.
+The major problem is that if you use less and then hit the End key less
+will try to go beyond the end of the virtual position.
+A simple way around this is to use cat on the file and pipe that to less.
+By this method you will go to end of file when you hit the End key for less.
+
+Utilities like less use llseek to find its positions in the file.
+Without any workaround less would ending up in the wrong position in
+the file.
+To solve the problem the ODS2 driver keep track of the virtual position
+in the file (the position less knows about) and create checkpoints every 64K
+position. By these checkpoints function llseek can find its position by
+searching from the closest position instead reading all records from start.
+
+License
+=======
+
+The ODS2 source code is released under GNU General Public License (GPL).
+
+Author
+======
+
+The ODS2 driver is written by me, Jonas Lindholm, and I was doing it for fun and
+to get deeper knowledge of file systems on Linux.
+It is also a challange to get it to work and it seems that people are looking
+for a ODS filoe system module for Linux.
+Later versions will support write as well.
