@@ -1,0 +1,182 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+# Sample debian/rules that uses debhelper. 
+# GNU copyright 1997 by Joey Hess.
+#
+# This version is for a hypothetical package that can build a kernel modules
+# architecture-dependant package via make-kpkg, as well as an
+# architecture-independent module source package, and other packages
+# either dep/indep for things like common files or userspace components
+# needed for the kernel modules.
+#
+# This file can also be used with module-assistant, thanks to the help
+# of Eduard Bloch
+
+# Uncomment this to turn on verbose mode. 
+#export DH_VERBOSE=1
+
+CFLAGS = -Wall -g
+
+ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
+	CFLAGS += -O0
+else
+	CFLAGS += -O2
+endif
+ifeq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))
+	INSTALL_PROGRAM += -s
+endif
+
+UPSTREAM_VERSION=$(shell dpkg-parsechangelog |grep ^Version | cut -d ' ' -f2 | cut -d "-" -f1)
+PACKAGE=ods2-modules
+psource=ods2-source
+MA_DIR ?= /usr/share/modass
+-include $(MA_DIR)/include/generic.make
+-include $(MA_DIR)/include/common-rules.make
+
+configure: configure-stamp
+configure-stamp:
+	touch configure-stamp
+
+
+build-arch: configure-stamp  build-arch-stamp
+build-arch-stamp:
+	touch build-arch-stamp
+
+# the binary-modules target prepares the $(pmodules) package.
+# It is called by make-kpkg and *not* during a normal build
+binary-modules: kdist_config
+	export DH_OPTIONS='-p$(PKGNAME)'
+
+	dh_testdir
+	dh_testroot
+	dh_clean -k
+
+	# Build the module
+	$(MAKE) -C driver KSRC=$(KSRC) KVER=$(KVERS)
+	mkdir -p debian/ods2-$(KVERS)/lib/modules/$(KVERS)/kernel/fs/ods2
+	cp driver/ods2.ko debian/ods2-$(KVERS)/lib/modules/$(KVERS)/kernel/fs/ods2
+
+	# Install the module
+	$(MAKE) install -C driver DESTDIR=$(CURDIR)/debian/$(PKGNAME) KSRC=$(KSRC) KVER=$(KVERS)
+	mkdir -p $(CURDIR)/debian/$(PKGNAME)/lib/modules/$(KVERS)/kernel/fs/ods2
+	cp driver/ods2.ko $(CURDIR)/debian/$(PKGNAME)/lib/modules/$(KVERS)/kernel/fs/ods2
+
+	dh_installdebconf
+	dh_installdocs
+	dh_installchangelogs
+	cp -p $(CURDIR)/debian/$(PKGNAME)/usr/share/doc/$(PKGNAME)/changelog $(CURDIR)/debian/$(PKGNAME)/usr/share/doc/$(PKGNAME)/changelog.Debian
+	dh_compress
+
+	dh_installdeb
+	dh_gencontrol -- -v$(VERSION)
+	dh_md5sums
+	dh_builddeb --destdir=$(DEB_DESTDIR)
+
+# Map make-kpkgs targets to module assistant targets
+kdist_config: prep-deb-files
+kdist_configure: kdist_config
+kdist_clean: clean
+
+build-indep:  configure-stamp build-indep-stamp
+build-indep-stamp:
+	touch build-indep-stamp
+
+build: build-arch build-indep
+
+clean:
+	dh_testdir
+	$(ROOT_CMD) dh_testroot
+	$(ROOT_CMD) rm -f build-arch-stamp build-indep-stamp configure-stamp
+
+	$(ROOT_CMD) rm -rf modules
+	-$(ROOT_CMD) $(MAKE) clean
+	-$(ROOT_CMD) $(MAKE) -C driver clean
+
+	$(ROOT_CMD) dh_clean
+
+install: DH_OPTIONS=
+install: build
+	dh_testdir
+	dh_testroot
+	dh_clean -k
+	dh_installdirs
+
+	# Create the directories to install the source into
+	dh_installdirs -p$(psource)  usr/src/modules/ods2/driver
+	dh_installdirs -p$(psource)  usr/src/modules/ods2/debian
+
+	# Copy only the driver source to the proper location
+	tar -cf - -T debian/driver.files | tar -C debian/$(psource)/usr/src/modules/ods2/driver -xf -
+	# Copy the needed debian/ pieces to the proper location
+	cp -a debian/control debian/*.modules.in* \
+		debian/rules debian/changelog debian/copyright debian/compat \
+		debian/$(psource)/usr/src/modules/ods2/debian/
+	cd debian/ods2-source/usr/src && \
+		tar c modules | gzip -9 > ods2-source.tar.gz && rm -rf modules
+	dh_install
+
+# Build architecture-independent files here.
+# Pass -i to all debhelper commands in this target to reduce clutter.
+binary-indep: build install
+	dh_testdir -i
+	dh_testroot -i
+#	dh_installchangelogs CHANGES -i
+	dh_installchangelogs -i
+	dh_installdocs -i
+	dh_installexamples -i
+#	dh_install -i
+#	dh_installmenu -i
+#	dh_installdebconf -i
+#	dh_installlogrotate -i
+#	dh_installemacsen -i
+#	dh_installpam -i
+#	dh_installmime -i
+#	dh_installinit -i
+#	dh_installcron -i
+#	dh_installinfo -i
+	dh_installman -i
+	dh_link -i
+	dh_compress -i
+	dh_fixperms -i
+#	dh_perl -i
+#	dh_python -i
+#	dh_makeshlibs -i
+	dh_installdeb -i
+	dh_shlibdeps -i
+	dh_gencontrol -i
+	dh_md5sums -i
+	dh_builddeb -i
+
+# Build architecture-dependent files here.
+binary-arch: build install
+	dh_testdir -s
+	dh_testroot -s
+#	dh_installdebconf -s
+	dh_installdocs -s
+	dh_installexamples -s
+	dh_installmenu -s
+#	dh_installlogrotate -s
+#	dh_installemacsen -s
+#	dh_installpam -s
+#	dh_installmime -s
+#	dh_installinit -s
+	dh_installcron -s
+#	dh_installman -s
+	dh_installinfo -s
+#	dh_installchangelogs CHANGES -s
+	dh_installchangelogs -s
+	dh_strip -s
+	dh_link -s
+	dh_compress -s
+	dh_fixperms -s
+#	dh_makeshlibs -s
+	dh_installdeb -s
+#	dh_perl -s
+	dh_shlibdeps -s
+	dh_gencontrol -s
+	dh_md5sums -s
+	dh_builddeb -s
+
+binary: binary-indep
+.PHONY: build clean binary-indep binary-arch binary install configure binary-modules kdist kdist_config kdist_image kdist_clean
+

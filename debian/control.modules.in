@@ -1,0 +1,13 @@
+Source: ods2
+Section: misc
+Priority: optional
+Maintainer: Roar Thronæs <roart@nvg.ntnu.no>
+Build-Depends: debhelper (>> 4.0)
+Description: Source for the ODS-2 file system
+ This package contains the source for the ODS-2 file system.
+
+Package: ods2-modules-_KVERS_
+Architecture: any
+Provides: ods2-modules
+Description: Source for the ODS-2 file system
+ This package contains the source for the ODS-2 file system.
