@@ -34,6 +34,8 @@
 typedef long sector_t
 #endif
 
+static void ods2_inc_count(struct inode *inode);
+
 #include "ods2.h"
 
 #ifndef TWOSIX
