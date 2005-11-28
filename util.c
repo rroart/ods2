@@ -41,14 +41,17 @@ u64 div64(u64 a, u32 b0) {
 u32 vbn2lbn(struct super_block *sb, ODS2MAP *map, u32 vbn) {
 	int			    idx = 0;
 	u32			    curvbn = 1; /* VBN is 1 based - not 0 */
-	
+
+	//printk("map %x %x\n",map,vbn);
 	while (map && map->s1[idx].cnt > 0 && curvbn < vbn && curvbn + map->s1[idx].cnt <= vbn) {
+		//printk("cur %x %x %x\n",curvbn,map->s1[idx].cnt,map->s1[idx].lbn);
 		curvbn += map->s1[idx].cnt;
 		if (++idx > 15) {
 			map = map->nxt;
 			idx = 0;
 		}
 	}
+	//printk("cur %x %x %x\n",curvbn,map->s1[idx].cnt,map->s1[idx].lbn);
 	if (map && map->s1[idx].cnt > 0) {
 		return map->s1[idx].lbn + (vbn - curvbn);
 	}
@@ -59,6 +62,7 @@ u32 vbn2lbn(struct super_block *sb, ODS2MAP *map, u32 vbn) {
 u32 ino2fhlbn(struct super_block *sb, u32 ino) {
 	ODS2SB			   *ods2p = (ODS2SB *)sb->u.generic_sbp;
 	
+	//printk("hm2 cont %x %x %x\n",ino,ods2p->hm2->hm2_w_ibmapsize,ods2p->hm2->hm2_l_ibmaplbn);
 	if (ino < 17) { /* the first 16 file headers are located at known locations in INDEXF.SYS */
 		return le16_to_cpu(ods2p->hm2->hm2_w_ibmapsize) + le32_to_cpu(ods2p->hm2->hm2_l_ibmaplbn) + ino - 1;
 	} else {
@@ -325,13 +329,44 @@ int	ods2_write_map(struct fh2def * fh2p,ODS2MAP * map) {
 			*mp++ = (start_pos) & 0xffff;
 			*mp++ = (start_pos) >> 16;
 			fh2p->fh2$b_map_inuse += 4;
-
 		}
 		map=map->nxt;
 	}
  out:
 	{}
 }
+
+extend_map(ODS2MAP *map, u32 vbn) {
+
+	int i;
+	while (map) {
+		for(i=0;i<16;i++) {
+			int block_count = map->s1[i].cnt;
+			int start_pos = map->s1[i].lbn;
+			if (start_pos==0)
+				goto out;
+
+		}
+		map=map->nxt;
+	}
+ out:
+	map->s1[i].cnt+=10; // gross hack
+}
+
+typedef unsigned short vmsword;
+
+unsigned short checksum(vmsword *block)
+{
+	int count = 255;
+	unsigned result = 0;
+	unsigned short *ptr = block;
+	do {
+		unsigned data = *ptr++;
+		result += VMSWORD(data);
+	} while (--count > 0);
+	return result;
+}
+
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically

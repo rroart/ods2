@@ -473,6 +473,12 @@ typedef struct ods2fh {
 #define fh2$b_idoffset fh2_b_idoffset
 #define fh2$b_mpoffset fh2_b_mpoffset
 #define fh2$b_map_inuse fh2_b_map_inuse
+#define fh2$b_acoffset fh2_b_acoffset
+#define fh2$b_rsoffset fh2_b_rsoffset
+#define fh2$w_struclev u1.fh2_w_struclev
+#define fh2$w_checksum fh2_w_checksum
+#define fh2$w_fid_num u2.s1.fh2_w_fid_num
+#define fh2$w_fid_seq u2.s1.fh2_w_fid_seq
 
 #define SS$_NORMAL 1
 #define SS$_BADPARAM    0x0014

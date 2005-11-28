@@ -39,7 +39,8 @@ struct file_operations ods2_dir_operations = {
 
 
 struct file_operations ods2_file_operations = {
-	read:		ods2_read,
+//	read:		ods2_read,
+	read:          generic_file_read,
 	write:          generic_file_write,
 	readdir:	NULL,
 	llseek:		ods2_llseek,
@@ -186,6 +187,40 @@ char unsigned vms2unixprot[] = {       /* ODS2 prot */
 	    0	|     0	  |	0   ,	/*	   */
 };
 
+static int ods2_get_block(struct inode *inode, long iblock, struct buffer_head *
+			  bh_result, int create);
+
+static int ods2_writepage(struct page *page)
+{
+        return block_write_full_page(page,ods2_get_block);
+}
+static int ods2_readpage(struct file *file, struct page *page)
+{
+        return block_read_full_page(page,ods2_get_block);
+}
+static int ods2_prepare_write(struct file *file, struct page *page, unsigned from, unsigned to)
+{
+        return block_prepare_write(page,from,to,ods2_get_block);
+}
+static int ods2_bmap(struct address_space *mapping, long block)
+{
+        return generic_block_bmap(mapping,block,ods2_get_block);
+}
+static int ods2_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsigned long blocknr, int blocksize)
+{
+        return generic_direct_IO(rw, inode, iobuf, blocknr, blocksize, ods2_get_block);
+}
+
+struct address_space_operations ods2_aops = {
+        readpage: ods2_readpage,
+        writepage: ods2_writepage,
+        sync_page: block_sync_page,
+        prepare_write: ods2_prepare_write,
+        commit_write: generic_commit_write,
+        bmap: ods2_bmap,
+        direct_IO: ods2_direct_IO,
+};
+
 void ods2_read_inode(struct inode *inode) {
 	struct super_block	   *sb = inode->i_sb;
 	struct buffer_head	   *bh;
@@ -215,12 +250,15 @@ void ods2_read_inode(struct inode *inode) {
 				ods2fhp->map = getmap(sb, fh2p);
 
 				if (fh2p->u4.s1.fch_v_directory) {
+					printk("read a dir\n");
 					inode->i_mode = S_IFDIR;
 					inode->i_op = &ods2_dir_inode_operations;
 					inode->i_fop = &ods2_dir_operations;
+					inode->i_mapping->a_ops = &ods2_aops;
 				} else {
 					inode->i_mode = S_IFREG;
 					inode->i_fop = &ods2_file_operations;
+					inode->i_mapping->a_ops = &ods2_aops;
 				}
 
 				inode->i_uid = le16_to_cpu(fh2p->u5.s1.fh2_w_mem);
@@ -262,10 +300,13 @@ void ods2_read_inode(struct inode *inode) {
 		} else {
 			bforget(bh);
 			printk("ODS2-fs kmalloc failed for extension inode\n");
+#if 0
+// not yet
 			kfree(inode->u.generic_ip);
+#endif
 		}
 	}
-	printk("ODS2-fs error reading inode\n");
+	printk("ODS2-fs error reading inode %x\n",fhlbn);
 	make_bad_inode(inode);
 }
 
@@ -286,11 +327,17 @@ void ods2_clear_inode(struct inode *inode) {
 		while (map != NULL) {
 			ODS2MAP		     *nxt = map->nxt;
 			
+#if 0
+// not yet
 			kfree(map);
+#endif
 			map = nxt;
 		}
+#if 0
+// not yet
 		ods2fhp->map = NULL;
-		
+#endif		
+
 		if (ods2fhp->ods2vari != NULL) { /* in case the file was of variable record type */
 			int			idx;
 			
@@ -300,15 +347,24 @@ void ods2_clear_inode(struct inode *inode) {
 				while (ods2varp != NULL) {
 					ODS2VAR		   *nxt = ods2varp->nxt;
 					
+#if 0
+// not yet
 					kfree(ods2varp);
+#endif
 					ods2varp = nxt;
 				}
 			}
+#if 0
+// not yet
 			kfree(ods2fhp->ods2vari);
 			ods2fhp->ods2vari = NULL;
+#endif
 		}
+#if 0
+//not yet
 		kfree(inode->u.generic_ip);
 		inode->u.generic_ip = NULL;
+#endif
 	}
 }
 
@@ -325,23 +381,28 @@ void ods2_delete_inode(struct inode *inode) {
 
 static int ods2_update_inode(struct inode * inode, int do_sync)
 {
-	struct buffer_head * bh;
+	struct buffer_head * bh = 0;
 	struct fh2def * fh2p;
 	int err = 0;
 	signed int fhlbn;
 
-	if ((fhlbn = ino2fhlbn(inode->i_sb, inode->i_ino)) > 0 &&
-	    (!(bh = sb_bread(inode->i_sb, GETBLKNO(inode->i_sb, fhlbn))) != NULL && bh->b_data != NULL)) {
+	printk("ods2_write_inode %x %x \n",inode->i_ino,do_sync);
+	if (!((fhlbn = ino2fhlbn(inode->i_sb, inode->i_ino)) > 0 &&
+	    ((bh = sb_bread(inode->i_sb, GETBLKNO(inode->i_sb, fhlbn))) != NULL && bh->b_data != NULL))) {
 #if 0
 		ods2_error (inode->i_sb, "ods2_write_inode",
 			    "unable to read inode block - "
 			    "inode=%lu, block=%lu", inode->i_ino, fhlbn);
+#else
+		printk("er ods2_write_inode %x %x %x %x %x\n",inode->i_ino, fhlbn,inode->i_sb, GETBLKNO(inode->i_sb, fhlbn), bh);
 #endif
 		return -EIO;
 	}
 
+	printk("bh %x %x\n",bh,fhlbn);
 	fh2p = bh->b_data;
-
+	memset(fh2p, 0, 512);
+	printk("fh2p %x\n",fh2p);
 	
 	
 	ODS2FH		       *ods2fhp;
@@ -349,24 +410,24 @@ static int ods2_update_inode(struct inode * inode, int do_sync)
 	FATDEF		       *fatp;
 
 	ods2fhp = (ODS2FH *)inode->u.generic_ip;
-	fh2p->fh2$b_idoffset=0x28;
 	ods2_write_map(fh2p,ods2fhp->map);
+	fh2p->fh2$b_idoffset=0x28;
+	fh2p->fh2$b_mpoffset=0x64;
+	fh2p->fh2$b_acoffset=0xff;
+	fh2p->fh2$b_rsoffset=0xff;
+	fh2p->fh2$w_struclev=0x201;
+	fh2p->fh2$w_fid_num=inode->i_ino;
+	fh2p->fh2$w_fid_seq=1;
 	fi2p = (FI2DEF *)((short unsigned *)fh2p + fh2p->fh2_b_idoffset);
 	fatp = (FATDEF *)&(fh2p->fh2_w_recattr);
 
 	memcpy(fatp, &ods2fhp->fat, sizeof(FATDEF));
 	//ods2fhp->map = getmap(sb, fh2p);
 
-	switch (inode->i_mode) {
-	case S_IFDIR:
+	if (inode->i_mode&S_IFDIR)
 		fh2p->u4.s1.fch_v_directory=1;
-		break;
-	case S_IFREG:
-		break;
-	default:
-		panic("unknown mode\n");
-		break;
-	}
+	if (inode->i_mode&S_IFDIR)
+		printk("read a dir2\n");
 
 	fh2p->u5.s1.fh2_w_mem=cpu_to_le16(inode->i_uid);
 	fh2p->u5.s1.fh2_w_grp=cpu_to_le16(inode->i_gid);
@@ -403,6 +464,8 @@ static int ods2_update_inode(struct inode * inode, int do_sync)
 	fatp->fat$w_versions=1;
 				
 	ods2fhp->parent = (fh2p->u6.s1.fid_b_nmx << 16) |  le16_to_cpu(fh2p->u6.s1.fid_w_num);
+
+	fh2p->fh2$w_checksum = VMSWORD(checksum(fh2p));
 
 	ods2_write_super(inode->i_sb);
 	
@@ -524,7 +587,7 @@ static int ods2_get_block(struct inode *inode, long iblock, struct buffer_head *
 	int vbn=iblock;
 	int i;
 
-	lbn = vbn2lbn(sb, ods2fhp->map, vbn);
+	lbn = vbn2lbn(sb, ods2fhp->map, vbn+1);
 
 	if (lbn > 0) {
 		bh_result->b_dev = inode->i_dev;
@@ -540,12 +603,15 @@ static int ods2_get_block(struct inode *inode, long iblock, struct buffer_head *
 	ods2p = ODS2_SB(sb);
 	ods2fhp = inode->u.generic_ip;
 
-	bitmap_search(sb, &pos, 1);
-	bitmap_modify(sb, pos, 1, 0);
+	// times 20, need to prealloc a bit
+	int count = 1 * 20;
+	bitmap_search(sb, &pos, &count);
+	bitmap_modify(sb, pos, 1*20, 0);
 
 	//new_map = kmalloc(sizeof(ODS2MAP), GFP_KERNEL);
 	
 	hm2=ods2p->hm2;
+	printk("pos %x %x\n",pos,hm2->hm2$w_cluster);
 	lbn=hm2->hm2$w_cluster*pos;
 
 	//new_map->lbn=lbn;
@@ -556,7 +622,7 @@ static int ods2_get_block(struct inode *inode, long iblock, struct buffer_head *
 	for(i=0;i<16;i++) {
 		if (map->s1[i].lbn==0) {
 			map->s1[i].lbn=lbn;
-			map->s1[i].lbn=1 * hm2->hm2$w_cluster;
+			map->s1[i].cnt=1 * hm2->hm2$w_cluster *20;
 			goto map_set;
 		}
 	}
@@ -567,7 +633,7 @@ static int ods2_get_block(struct inode *inode, long iblock, struct buffer_head *
 
 	i=0;
 	map->s1[i].lbn=lbn;
-	map->s1[i].lbn=1 * hm2->hm2$w_cluster;
+	map->s1[i].cnt=1 * hm2->hm2$w_cluster * 20;
 
  map_set:
 
@@ -576,36 +642,6 @@ static int ods2_get_block(struct inode *inode, long iblock, struct buffer_head *
 	bh_result->b_state |= (1UL << BH_New) | (1UL << BH_Mapped);
 	return 0;
 }
-
-static int ods2_writepage(struct page *page)
-{
-        return block_write_full_page(page,ods2_get_block);
-}
-static int ods2_readpage(struct file *file, struct page *page)
-{
-        return block_read_full_page(page,ods2_get_block);
-}
-static int ods2_prepare_write(struct file *file, struct page *page, unsigned from, unsigned to)
-{
-        return block_prepare_write(page,from,to,ods2_get_block);
-}
-static int ods2_bmap(struct address_space *mapping, long block)
-{
-        return generic_block_bmap(mapping,block,ods2_get_block);
-}
-static int ods2_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsigned long blocknr, int blocksize)
-{
-        return generic_direct_IO(rw, inode, iobuf, blocknr, blocksize, ods2_get_block);
-}
-struct address_space_operations ods2_aops = {
-        readpage: ods2_readpage,
-        writepage: ods2_writepage,
-        sync_page: block_sync_page,
-        prepare_write: ods2_prepare_write,
-        commit_write: generic_commit_write,
-        bmap: ods2_bmap,
-        direct_IO: ods2_direct_IO,
-};
 
 static int ods2_create (struct inode * dir, struct dentry * dentry, int mode)
 {

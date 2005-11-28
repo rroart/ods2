@@ -34,8 +34,11 @@ static void ods2_put_super(struct super_block *sb) {
 	
 	if (ods2p != NULL) {
 		iput(ods2p->indexf); /* release INDEXF.SYS;1 */
+#if 0
+// not yet
 		kfree(ods2p->ibitmap);
 		kfree(sb->u.generic_sbp);
+#endif
 	}
 }
 
@@ -81,7 +84,6 @@ int ods2_read_bitmap(struct super_block *sb) {
 	struct buffer_head	   *bh;
 	struct inode		   *inode;
 	
-	printk("Reading bitmap\n");
 	if ((inode = iget(sb, 2)) != NULL) { /* this is BITMAP.SYS */
 		ODS2FH			 *ods2fhp = (ODS2FH *)(inode->u.generic_ip);
 		u32			  lbn;
@@ -149,7 +151,6 @@ int ods2_read_ibitmap(struct super_block *sb) {
 	struct buffer_head	   *bh;
 	int			    idx;
 
-	printk("Reading ibitmap\n");
 	ods2p->statfs.f_ffree = 0;
 	if ((ods2p->ibitmap = kmalloc(ods2p->hm2->hm2_w_ibmapsize << 9, GFP_KERNEL)) != NULL) {
 		memset(ods2p->ibitmap, 0, (ods2p->hm2->hm2_w_ibmapsize << 9));
@@ -160,7 +161,10 @@ int ods2_read_ibitmap(struct super_block *sb) {
 
 				memcpy((ods2p->ibitmap + (idx << 9)), GETBLKP(sb, ods2p->hm2->hm2_l_ibmaplbn + idx, bh->b_data), 512);
 				for (cnt = 0; cnt < 512; cnt++, bp++) { ods2p->statfs.f_ffree += (nibble2bits[(*bp & 0x0f) ^ 0xf] + nibble2bits[(*bp >> 4) ^ 0xf]); }
+#if 0
+// not yet
 				bforget(bh);
+#endif
 			}
 		}
 		return 1;
@@ -178,7 +182,6 @@ static struct super_block * ods2_read_super(struct super_block *sb, void *data, 
 	struct buffer_head	   *bh;
 	ODS2SB			   *ods2p;
 
-	printk("in read_super\n");
 	sb_set_blocksize(sb, get_hardsect_size(sb->s_dev));
 	if ((bh = sb_bread(sb, GETBLKNO(sb, 1))) != NULL && bh->b_data != NULL) {
 
@@ -186,7 +189,6 @@ static struct super_block * ods2_read_super(struct super_block *sb, void *data, 
 		u16		    chksum1 = 0;
 		u16                 chksum2 = 0;
 
-		printk("Done bread\n");
 		if ((sb->u.generic_sbp = kmalloc(sizeof(ODS2SB), GFP_KERNEL)) == NULL) {
 			printk("ODS2-fs kmalloc failed for sb generic\n");
 			return NULL;
@@ -195,11 +197,6 @@ static struct super_block * ods2_read_super(struct super_block *sb, void *data, 
 		//memcpy(&ods2p->hm2, GETBLKP(sb, 1, bh->b_data), sizeof(HM2DEF));
 		ods2p->bh = bh;
 		ods2p->hm2 = bh->b_data;
-		{ 
-			int i=0;
-			unsigned char * c=ods2p->hm2;
-			for(i=0;i<20;i++) printk("%x ",c[i]);
-		}
 		//brelse(bh);
 		
 		for (p = (u16 *)(ods2p->hm2) ; p < (u16 *)&(ods2p->hm2->hm2_w_checksum1) ; chksum1 += *p++);
@@ -208,8 +205,6 @@ static struct super_block * ods2_read_super(struct super_block *sb, void *data, 
 		/*
 		  This is the way to check for a valid home block.
 		*/
-
-		printk("chksum %x %x %x %x\n",chksum1,ods2p->hm2->hm2_w_checksum1,chksum2,ods2p->hm2->hm2_w_checksum2);
 
 		if (ods2p->hm2->hm2_l_homelbn != 0 && ods2p->hm2->hm2_l_alhomelbn != 0 &&
 		    ods2p->hm2->hm2_l_altidxlbn != 0 && ods2p->hm2->hm2_w_cluster != 0 &&
@@ -229,6 +224,8 @@ static struct super_block * ods2_read_super(struct super_block *sb, void *data, 
 			sb->s_op = &ods2_sops;
 
 			ods2p->indexf = iget(sb, 1); /* read INDEXF.SYS. */
+
+			extend_map(((ODS2FH *)ods2p->indexf->u.generic_ip)->map); // gross hack
 			
 			sb->s_root = d_alloc_root(iget(sb, 4)); /* this is 000000.DIR;1 */
 			
@@ -271,10 +268,16 @@ static struct super_block * ods2_read_super(struct super_block *sb, void *data, 
 					printk("ODS2-fs This is a valid ODS2 file system with format /%s/ and volume name /%s/ and owner /%s/\n", format, volname, volowner);
 					return sb;
 				}
+#if 0
+// not yet
 				kfree(ods2p->ibitmap);
+#endif
 			}
 		}
+#if 0
+// not yet
 		kfree(sb->u.generic_sbp);
+#endif
 	}
 	return NULL;
 }

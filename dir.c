@@ -179,7 +179,7 @@ struct _dir {
 
 struct _dir1 {
 	char dir$w_version;
-	char dir$fid[3];
+	short dir$fid[3];
 };
 
 struct dsc$descriptor {
@@ -274,6 +274,7 @@ unsigned name_check(char *str,int len,int *retlen,int *retver,int *wildflag)
     char *name_end = name + len;
     direct_checks++;
 
+    //printk("namech %s %x\n",str,len);
     /* Go through the specification checking for illegal characters */
 
     while (name < name_end) {
@@ -289,12 +290,15 @@ unsigned name_check(char *str,int len,int *retlen,int *retver,int *wildflag)
                 if (ch == '*' || ch == '%') {
                     wildcard = 1;
                 } else {
+			//printk("namech1 %c %s\n",ch,name);
                     if (ch == '[' || ch == ']' || ch == ':' ||
                         !isprint(ch)) return SS$_BADFILENAME;
                 }
             }
         }
     }
+    //printk("namech2 %s %s\n",name,name_start);
+    //printk("namech2 %x %x %x\n",name,name_start,name - name_start);
     if ((name - name_start) > 40) return SS$_BADFILENAME;
 
     /* Return the name length and start checking the version */
@@ -304,6 +308,7 @@ unsigned name_check(char *str,int len,int *retlen,int *retver,int *wildflag)
     if (name < name_end) {
         char ch = *name;
         if (ch == '*') {
+		//printk("namech3 %s %x\n",&name[1],name_end);
             if (++name < name_end) return SS$_BADFILENAME;
             dots = 32768;       /* Wildcard representation of version! */
             wildcard = 1;
@@ -315,6 +320,7 @@ unsigned name_check(char *str,int len,int *retlen,int *retver,int *wildflag)
             }
             while (name < name_end) {
                 ch = *name++;
+		//printk("namech4 %c %s\n",ch,name-1);
                 if (!isdigit(ch)) return SS$_BADFILENAME;
                 dots = dots * 10 + (ch - '0');
             }
@@ -338,6 +344,7 @@ unsigned name_check(char *str,int len,int *retlen,int *retver,int *wildflag)
 
 int name_match(char *spec,int spec_len,char *dirent,int dirent_len)
 {
+	//printk("namem %s %x %s %x\n",spec,spec_len,dirent,dirent_len);
     int percent = MAT_GT;
     char *name = spec,*entry = dirent;
     char *name_end = name + spec_len,*entry_end = entry + dirent_len;
@@ -471,6 +478,9 @@ unsigned insert_ent(struct inode * inode,unsigned eofblk,unsigned curblk,
     struct super_block * sb = inode->i_sb;
     ODS2FH                     *ods2fhp = (ODS2FH *)inode->u.generic_ip;
 
+    //printk("insert ent %x %x %x %x %x %x %s %x %x %x\n",inode,eofblk,curblk,buffer,dr,de,filename,filelen,version,fid);
+    int i;
+    //for(i=0;i<32;i++) printk("%c %x \n",buffer[i],(unsigned char)buffer[i]);
     /* Compute space required... */
 
     int addlen = sizeof(struct _dir1);
@@ -489,13 +499,14 @@ unsigned insert_ent(struct inode * inode,unsigned eofblk,unsigned curblk,
             struct _dir *nr = (struct _dir *) (buffer + inuse);
             if (dr == nr) invalid_dr = 0;
             sizecheck = VMSWORD(nr->dir$w_size);
-            if (sizecheck == 0xffff)
+            if (sizecheck == 0xffff || sizecheck == 0xffffffff) // check. did not need 0xffffffff before
                 break;
             sizecheck += 2;
             inuse += sizecheck;
             sizecheck -= (nr->dir$b_namecount + STRUCT_DIR_SIZE) & ~1;
             if (inuse > MAXREC || (inuse & 1) || sizecheck <= 0 ||
                 sizecheck % sizeof(struct _dir1) != 0 ) {
+		    printk("BAD %x %x %x %x %x %x %x\n",inuse,MAXREC,sizecheck,sizeof(struct _dir1),nr->dir$b_namecount,STRUCT_DIR_SIZE);
                 return SS$_BADIRECTORY;
             }
         } while (1);
@@ -727,7 +738,7 @@ unsigned search_ent(struct inode * inode,
     struct _fibdef *fib = (struct _fibdef *) fibdsc->dsc$a_pointer;
     direct_lookups++;
 
-    printk("od2sfhp %x\n",ods2fhp);
+    //printk("od2sfhp %x %x %x\n",ods2fhp,inode->i_ino,eofblk);
     /* 1) Generate start block (wcc gives start point)
        2) Search for start
        3) Scan until found or too big or end   */
@@ -736,11 +747,13 @@ unsigned search_ent(struct inode * inode,
     if (curblk != 0) {
         searchspec = resdsc->dsc$a_pointer;
         sts = name_check(searchspec,*reslen,&searchlen,&version,&wildcard);
+	//printk("ac wi st %x %x %x\n",action,wildcard,sts);
         if (action || wildcard) sts = SS$_BADFILENAME;
         wcc_flag = 1;
     } else {
         searchspec = filedsc->dsc$a_pointer;
         sts = name_check(searchspec,filedsc->dsc$w_length,&searchlen,&version,&wildcard);
+	//printk("ac wi st ve %x %x %x %x\n",action,wildcard,sts,version);
         if ((action && wildcard) || (action > 1 && version < 0)) sts = SS$_BADFILENAME;
         wcc_flag = 0;
     }
@@ -914,6 +927,7 @@ unsigned search_ent(struct inode * inode,
                             }
                         } else {
                             if (cmp != MAT_NE && action == 2) {
+				    mark_buffer_dirty(bh);
                                 return insert_ent(inode,eofblk,curblk,buffer,dr,de,
                                                   searchspec,searchlen,version,(struct _fiddef *) & fib->fib$w_fid_num);
                             }
@@ -950,6 +964,7 @@ unsigned search_ent(struct inode * inode,
                 curblk++;
             } else {
                 if (version == 0) version = 1;
+		mark_buffer_dirty(bh);
                 return insert_ent(inode,eofblk,curblk,buffer,dr,NULL,
                                   searchspec,searchlen,version,(struct _fiddef *) & fib->fib$w_fid_num);
             }
@@ -966,7 +981,6 @@ unsigned search_ent(struct inode * inode,
             sts = SS$_NOSUCHFILE;
         }
     }
-    mark_buffer_dirty(bh);
     return sts;
 }
 
@@ -977,24 +991,33 @@ int ods2_add_link (struct dentry *dentry, struct inode *inode)
 	int namelen = dentry->d_name.len;
 	struct page *page = NULL;
 	int err=0;
-	short reslen;
+	short reslen=namelen+2;
 	char res[64];
 	struct dsc$descriptor filedsc;
 	struct dsc$descriptor resdsc;
 	struct _fibdef  fib;
 	struct dsc$descriptor fibdsc;
-	filedsc.dsc$a_pointer=name;
-	filedsc.dsc$w_length=namelen;
-	resdsc.dsc$a_pointer=res;
-	resdsc.dsc$w_length=64;
+	char * newname = kmalloc(namelen+3,GFP_KERNEL); // another leak
+	memcpy(newname,name,namelen);
+	newname[namelen]=';';
+	newname[namelen+1]='1';
+	newname[namelen+2]=0;
+	filedsc.dsc$a_pointer=newname;
+	filedsc.dsc$w_length=namelen+1;
+	resdsc.dsc$a_pointer=newname;
+	resdsc.dsc$w_length=namelen+1;
 	fibdsc.dsc$a_pointer=&fib;
 	fibdsc.dsc$w_length=sizeof(fib);
 
 	fib.fib$w_fid_num = inode->i_ino;
 	fib.fib$w_fid_seq = 1;
+	fib.fib$b_fid_nmx = 0;
+	fib.fib$b_fid_rvn = 0;
+	fib.fib$l_wcc = 0;
 
-	search_ent(dentry->d_parent->d_inode,&fibdsc,&filedsc,&reslen,&resdsc,inode->i_blocks,2);
-
+	//printk("isi %x %x\n",dentry->d_parent->d_inode->i_size,dentry->d_parent->d_inode->i_blocks);
+	int sts = search_ent(dentry->d_parent->d_inode,&fibdsc,&filedsc,&reslen,&resdsc,dentry->d_parent->d_inode->i_blocks,2);
+	//printk("search ent %x\n",sts);
 out:
 	return err;
 }

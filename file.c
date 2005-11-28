@@ -646,6 +646,14 @@ loff_t ods2_llseek(struct file *filp, loff_t loff, int seek) {
 
 
 int ods2_open_release(struct inode *inode, struct file *filp) {
+	printk("priv %x \n",filp->private_data);
+	if (filp->private_data==0x246) {
+		unsigned long * c=filp;
+		int i;
+		for(i=0;i<32;i++) printk("%8x ",c[i]);
+		filp->private_data = NULL;
+		return 0;
+	}
 	if (filp->private_data == NULL) {
 		if ((filp->private_data = kmalloc(sizeof(ODS2FILE), GFP_KERNEL)) != NULL) {
 			memset(filp->private_data, 0, sizeof(ODS2FILE));
@@ -657,8 +665,11 @@ int ods2_open_release(struct inode *inode, struct file *filp) {
 		ODS2FILE		   *ods2filep = (ODS2FILE *)filp->private_data;
 		
 		if (ods2filep != NULL) {
+#if 0
+// not yet?
 			brelse(ods2filep->bhp);
 			kfree(filp->private_data);
+#endif
 		}
 		filp->private_data = NULL;
 	}
