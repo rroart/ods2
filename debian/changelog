@@ -1,5 +1,12 @@
+ods2 (0.9.3.w4) unstable; urgency=low
+
+  * * extend index file
+
+ -- Roar Thronæs <roart@nvg.ntnu.no>  Mon, 29 Nov 2005 10:30:00 +0200
+
 ods2 (0.9.3.w3p1) unstable; urgency=low
 
   * * first shot
 
  -- Roar Thronæs <roart@nvg.ntnu.no>  Mon, 18 Nov 2005 10:30:00 +0200
+
