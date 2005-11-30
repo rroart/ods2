@@ -1,8 +1,9 @@
 ods2 (0.9.3.w4) unstable; urgency=low
 
   * * extend index file
+  * * change file allocation algorithm to doubling each time
 
- -- Roar Thronæs <roart@nvg.ntnu.no>  Mon, 29 Nov 2005 10:30:00 +0200
+ -- Roar Thronæs <roart@nvg.ntnu.no>  Mon, 30 Nov 2005 12:30:00 +0200
 
 ods2 (0.9.3.w3p1) unstable; urgency=low
 
