@@ -687,10 +687,21 @@ static int ods2_get_block(struct inode *inode, sector_t iblock, struct buffer_he
 	ods2p = ODS2_SB(sb);
 	ods2fhp = inode->u.generic_ip;
 
+	map = ods2fhp->map;
+	int factor = 1;
+
+	// lazy. won't expand map, but will instead double allocation
+	for(i=1;i<16;i++) {
+		if (map->s1[i].lbn==0) {
+			factor=factor<<1;
+			break;
+		}
+	}
+
 	// times 20, need to prealloc a bit
-	int count = 1 * 20;
+	int count = 1 * 20 * factor;
 	bitmap_search(sb, &pos, &count);
-	bitmap_modify(sb, pos, 1*20, 0);
+	bitmap_modify(sb, pos, 1*20*factor, 0);
 
 	//new_map = kmalloc(sizeof(ODS2MAP), GFP_KERNEL);
 	
@@ -706,7 +717,7 @@ static int ods2_get_block(struct inode *inode, sector_t iblock, struct buffer_he
 	for(i=0;i<16;i++) {
 		if (map->s1[i].lbn==0) {
 			map->s1[i].lbn=lbn;
-			map->s1[i].cnt=1 * hm2->hm2$w_cluster *20;
+			map->s1[i].cnt=1 * hm2->hm2$w_cluster * 20 * factor;
 			goto map_set;
 		}
 	}
@@ -717,7 +728,7 @@ static int ods2_get_block(struct inode *inode, sector_t iblock, struct buffer_he
 
 	i=0;
 	map->s1[i].lbn=lbn;
-	map->s1[i].cnt=1 * hm2->hm2$w_cluster * 20;
+	map->s1[i].cnt=1 * hm2->hm2$w_cluster * 20 * factor;
 
  map_set:
 
