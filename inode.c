@@ -31,7 +31,7 @@
 #endif
 
 #ifndef TWOSIX
-typedef long sector_t
+typedef long sector_t;
 #endif
 
 static void ods2_inc_count(struct inode *inode);

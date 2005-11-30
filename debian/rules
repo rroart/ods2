@@ -54,12 +54,12 @@ binary-modules: kdist_config
 	# Build the module
 	$(MAKE) -C driver KSRC=$(KSRC) KVER=$(KVERS)
 	mkdir -p debian/ods2-$(KVERS)/lib/modules/$(KVERS)/kernel/fs/ods2
-	cp driver/ods2.ko debian/ods2-$(KVERS)/lib/modules/$(KVERS)/kernel/fs/ods2
+	cp driver/ods2.*o debian/ods2-$(KVERS)/lib/modules/$(KVERS)/kernel/fs/ods2
 
 	# Install the module
 	$(MAKE) install -C driver DESTDIR=$(CURDIR)/debian/$(PKGNAME) KSRC=$(KSRC) KVER=$(KVERS)
 	mkdir -p $(CURDIR)/debian/$(PKGNAME)/lib/modules/$(KVERS)/kernel/fs/ods2
-	cp driver/ods2.ko $(CURDIR)/debian/$(PKGNAME)/lib/modules/$(KVERS)/kernel/fs/ods2
+	cp driver/ods2.*o $(CURDIR)/debian/$(PKGNAME)/lib/modules/$(KVERS)/kernel/fs/ods2
 
 	dh_installdebconf
 	dh_installdocs
