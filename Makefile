@@ -28,7 +28,7 @@ all:
 	$(MAKE) -C $(KSRC) SUBDIRS=$(PWD) modules
 
 install:
-	$(MAKE) -C $(KSRC) SUBDIRS=$(pwd) modules_install
+#	$(MAKE) -C $(KSRC) SUBDIRS=$(pwd) modules_install
 
 clean:
 	-rm *.o *.ko .*.cmd *.mod.c *~
