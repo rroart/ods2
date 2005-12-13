@@ -55,7 +55,7 @@ struct file_operations ods2_file_operations = {
 	read:          generic_file_read,
 	write:          generic_file_write,
 	readdir:	NULL,
-	llseek:		ods2_llseek,
+	llseek:		generic_file_llseek, // was ods2_llseek
 	open:		ods2_open_release,
 	release:	ods2_open_release,
 	ioctl:		ods2_file_ioctl,
@@ -90,7 +90,7 @@ struct file_operations ods2_file_operations = {
 	.read=          generic_file_read,
 	.write=          generic_file_write,
 	//readdir=	NULL,
-	.llseek=		ods2_llseek,
+	.llseek=		generic_file_llseek, // was ods2_llseek
 	.open=		ods2_open_release,
 	.release=	ods2_open_release,
 	.ioctl=		ods2_file_ioctl,
@@ -674,6 +674,7 @@ static int ods2_get_block(struct inode *inode, sector_t iblock, struct buffer_he
 		bh_result->b_dev = inode->i_dev;
 #else
 		bh_result->b_bdev = inode->i_bdev;
+		bh_result->b_bdev = inode->i_sb->s_bdev;
 #endif
                 bh_result->b_blocknr = lbn;
                 bh_result->b_state |= (1UL << BH_Mapped);
@@ -691,11 +692,8 @@ static int ods2_get_block(struct inode *inode, sector_t iblock, struct buffer_he
 	int factor = 1;
 
 	// lazy. won't expand map, but will instead double allocation
-	for(i=1;i<16;i++) {
-		if (map->s1[i].lbn==0) {
-			factor=factor<<1;
-			break;
-		}
+	for(i=0;i<16 && map->s1[i].lbn;i++) {
+		factor=factor<<1;
 	}
 
 	// times 20, need to prealloc a bit
@@ -736,6 +734,7 @@ static int ods2_get_block(struct inode *inode, sector_t iblock, struct buffer_he
 	bh_result->b_dev = inode->i_dev;
 #else
 	bh_result->b_bdev = inode->i_bdev;
+	bh_result->b_bdev = inode->i_sb->s_bdev;
 #endif
 	bh_result->b_blocknr = lbn;
 	bh_result->b_state |= (1UL << BH_New) | (1UL << BH_Mapped);
