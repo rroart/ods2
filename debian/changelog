@@ -1,3 +1,11 @@
+ods2 (0.9.3.w5) unstable; urgency=low
+
+  * * doubling algorithm fix
+  * * ods2_llseek replaced by generic
+  * * bh_bdev was zero
+
+ -- Roar Thronæs <roart@nvg.ntnu.no>  Tue, 13 Dec 2005 14:30:00 +0200
+
 ods2 (0.9.3.w4) unstable; urgency=low
 
   * * extend index file
