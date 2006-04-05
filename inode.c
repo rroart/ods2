@@ -621,13 +621,25 @@ int ods2_make_empty(struct inode *inode, struct inode *parent)
         if (!page)
                 return -ENOMEM;
         err = mapping->a_ops->prepare_write(NULL, page, 0, 512);
-        if (err)
+        if (err) {
+#ifdef TWOSIX
+		unlock_page(page);
+#endif
                 goto fail;
+	}
 
+#ifndef TWOSIX
         buf = page_address(page);
+#else
+	buf = kmap_atomic(page, KM_USER0);
+#endif
 
 	memset(buf, 0, 512);
 	buf[0]=0xffff;
+
+#ifdef TWOSIX
+	kunmap_atomic(buf, KM_USER0);
+#endif
 
 	struct inode *dir = page->mapping->host;
 	page->mapping->a_ops->commit_write(NULL, page, 0, 512);
