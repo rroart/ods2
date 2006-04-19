@@ -577,6 +577,10 @@ ODS2MAP *getmap(struct super_block *sb, FH2DEF *fh2p);
 struct buffer_head *getfilebh(struct file *filp, u32 vbn);
 int verify_fh(FH2DEF *fh2p, u32 ino);
 int parse_options(struct super_block *sb, char *options);
+typedef unsigned short vmsword;
+unsigned short checksum(vmsword *block);
+int ods2_write_map(struct fh2def * fh2p,ODS2MAP * map);
+char * my_strstr (const char *, const char *);
 
 /*
   inode.c
@@ -597,6 +601,8 @@ void ods2_write_super (struct super_block * sb);
 int ods2_create (struct inode * dir, struct dentry * dentry, int mode);
 int ods2_link (struct dentry * old_dentry, struct inode * dir, struct dentry *dentry);
 int ods2_mkdir(struct inode * dir, struct dentry * dentry, int mode);
+int ods2_add_link (struct dentry *dentry, struct inode *inode);
+int ods2_add_nondir(struct dentry *dentry, struct inode *inode);
 
 /*
   dir.c
@@ -612,6 +618,14 @@ int ods2_file_ioctl(struct inode *inode, struct file *filp, int unsigned cmd, lo
 ssize_t ods2_read(struct file *filp, char *buf, size_t buflen, loff_t *loff);
 loff_t ods2_llseek(struct file *filp, loff_t loff, int seek);
 int ods2_open_release(struct inode *inode, struct file *filp);
+
+/*
+  bitmap.c
+*/
+
+struct inode * ods2_new_inode (const struct inode * dir, int mode);
+unsigned bitmap_search(struct super_block * sb,unsigned *position,unsigned *count);
+unsigned bitmap_modify(struct super_block * sb,unsigned cluster,unsigned count,unsigned release_flag);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

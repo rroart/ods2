@@ -1,3 +1,10 @@
+ods2 (0.9.3.w7) unstable; urgency=low
+
+  * * did not compile on amd64
+  * * was not 64-bit clean
+
+ -- Roar Thronæs <roart@nvg.ntnu.no>  Wed, 17 Apr 2006 10:45:00 +0200
+
 ods2 (0.9.3.w6) unstable; urgency=low
 
   * * mkdir oopsed in make_empty

@@ -1,5 +1,7 @@
 CONFIG_ODS2_FS=m
 
+CFLAGS  := $(CFLAGS) -Werror-implicit-function-declaration
+
 ifeq ($(PATCHLEVEL),4)
 O_TARGET := ods2.o
 

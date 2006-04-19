@@ -361,8 +361,6 @@ extend_map(ODS2MAP *map, u32 vbn) {
 }
 #endif
 
-typedef unsigned short vmsword;
-
 unsigned short checksum(vmsword *block)
 {
 	int count = 255;
