@@ -1,3 +1,9 @@
+ods2 (0.9.3.w8) unstable; urgency=low
+
+  * * did not compile on dapper and etch
+
+ -- Roar Thronæs <roart@nvg.ntnu.no>  Wed, 20 Apr 2007 13:00:00 +0200
+
 ods2 (0.9.3.w7) unstable; urgency=low
 
   * * did not compile on amd64

@@ -1,7 +1,10 @@
 // Author. Paul Nankervis.
 // Author. Roar Thronæs.
 
+#include <linux/version.h>
+#if LINUX_VERSION_CODE < 0x20612
 #include <linux/config.h>
+#endif
 #ifdef TWOSIX
 #include <linux/module.h>
 #endif
@@ -128,7 +131,9 @@ repeat:
 	fatp->fat$w_ffbyte=0;
 
 #ifdef TWOSIX
+#if LINUX_VERSION_CODE < 0x20612
 	inode->i_bdev=sb->s_bdev;
+#endif
 #endif
 
 	mark_inode_dirty(inode);

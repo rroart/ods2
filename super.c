@@ -11,7 +11,10 @@
  *
  */
 
+#include <linux/version.h>
+#if LINUX_VERSION_CODE < 0x20612
 #include <linux/config.h>
+#endif
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/fs.h>
@@ -29,6 +32,7 @@
 #else
 #include <linux/statfs.h>
 #include <linux/parser.h>
+#include <linux/version.h>
 #endif
 
 #include "ods2.h"
@@ -116,7 +120,11 @@ int ods2_read_bitmap(struct super_block *sb) {
 	struct inode		   *inode;
 	
 	if ((inode = iget(sb, 2)) != NULL) { /* this is BITMAP.SYS */
+#if LINUX_VERSION_CODE < 0x20614
 		ODS2FH			 *ods2fhp = (ODS2FH *)(inode->u.generic_ip);
+#else
+		ODS2FH			 *ods2fhp = (ODS2FH *)(inode->i_private);
+#endif
 		u32			  lbn;
 
 		if ((lbn = vbn2lbn(sb, ods2fhp->map, 1)) > 0 &&
@@ -382,14 +390,27 @@ void ods2_write_super (struct super_block * sb)
 #ifndef TWOSIX
 static DECLARE_FSTYPE_DEV(ods2_fs_type, "ods2", ods2_read_super);
 #else
+#ifndef LINUX_VERSION_CODE
+#error
+#endif
+#if LINUX_VERSION_CODE < 0x20612
 static struct super_block *ods2_get_sb(struct file_system_type *fs_type,
 				       int flags, const char *dev_name, void *data)
 {
         return get_sb_bdev(fs_type, flags, dev_name, data, ods2_fill_super);
 }
+#else
+static struct super_block *ods2_get_sb(struct file_system_type *fs_type,
+				       int flags, const char *dev_name, void *data, void * mnt)
+{
+        return get_sb_bdev(fs_type, flags, dev_name, data, ods2_fill_super, mnt);
+}
+#endif
 
 static struct file_system_type ods2_fs_type = {
+#if 0
 	.owner          = THIS_MODULE,
+#endif
 	.name           = "ods2",
 	.get_sb         = ods2_get_sb,
 	.kill_sb        = kill_block_super,
@@ -399,6 +420,7 @@ static struct file_system_type ods2_fs_type = {
 
 static int __init init_ods2_fs(void)
 {
+	printk("ods2 reg\n");
         return register_filesystem(&ods2_fs_type);
 }
 

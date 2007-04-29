@@ -11,7 +11,10 @@
  *
  */
 
+#include <linux/version.h>
+#if LINUX_VERSION_CODE < 0x20612
 #include <linux/config.h>
+#endif
 #ifdef TWOSIX
 #include <linux/module.h>
 #endif
@@ -122,7 +125,11 @@ struct dentry *ods2_lookup(struct inode *dir, struct dentry *dentry
 	struct buffer_head	   *bh = NULL;
 	char			   *vp;
 	u16     		   *rec;
+#if LINUX_VERSION_CODE < 0x20614
 	ODS2FH			   *ods2fhp = (ODS2FH *)dir->u.generic_ip;
+#else
+	ODS2FH			   *ods2fhp = (ODS2FH *)dir->i_private;
+#endif
 	u32			    vbn = 1;
 	u32			    lbn;
 	int			    vers = 0;
@@ -293,13 +300,21 @@ void ods2_read_inode(struct inode *inode) {
 
 		FH2DEF		       *fh2p = (FH2DEF *)(GETBLKP(sb, fhlbn, bh->b_data));
 
+#if LINUX_VERSION_CODE < 0x20614
 		if ((inode->u.generic_ip = kmalloc(sizeof(ODS2FH), GFP_KERNEL)) != NULL) {
+#else
+		if ((inode->i_private = kmalloc(sizeof(ODS2FH), GFP_KERNEL)) != NULL) {
+#endif
 
 			ODS2FH		       *ods2fhp;
 			FI2DEF		       *fi2p;
 			FATDEF		       *fatp;
 
+#if LINUX_VERSION_CODE < 0x20614
 			ods2fhp = (ODS2FH *)inode->u.generic_ip;
+#else
+			ods2fhp = (ODS2FH *)inode->i_private;
+#endif
 			ods2fhp->map = NULL;
 			ods2fhp->ods2vari = NULL;
 			fi2p = (FI2DEF *)((short unsigned *)fh2p + fh2p->fh2$b_idoffset);
@@ -386,7 +401,11 @@ void ods2_put_inode(struct inode *inode) {
 
 
 void ods2_clear_inode(struct inode *inode) {
+#if LINUX_VERSION_CODE < 0x20614
 	ODS2FH			 *ods2fhp = (ODS2FH *)inode->u.generic_ip;
+#else
+	ODS2FH			 *ods2fhp = (ODS2FH *)inode->i_private;
+#endif
 	
 	if (ods2fhp != NULL) {
 		ODS2MAP		       *map = ods2fhp->map;
@@ -476,7 +495,11 @@ static int ods2_update_inode(struct inode * inode, int do_sync)
 	FI2DEF		       *fi2p;
 	FATDEF		       *fatp;
 
+#if LINUX_VERSION_CODE < 0x20614
 	ods2fhp = (ODS2FH *)inode->u.generic_ip;
+#else
+	ods2fhp = (ODS2FH *)inode->i_private;
+#endif
 	ods2_write_map(fh2p,ods2fhp->map);
 	fh2p->fh2$b_idoffset=0x28;
 	fh2p->fh2$b_mpoffset=0x64;
@@ -608,7 +631,11 @@ static inline void ods2_dec_count(struct inode *inode)
  */
 int ods2_make_empty(struct inode *inode, struct inode *parent)
 {
+#if LINUX_VERSION_CODE < 0x20614
 	ODS2FH                   *ods2fhp=(ODS2FH *)inode->u.generic_ip;
+#else
+	ODS2FH                   *ods2fhp=(ODS2FH *)inode->i_private;
+#endif
 	int lbn;// = vbn2lbn(inode->i_sb, ods2fhp->map, 1);
 	struct buffer_head * bh;
 	short * buf;
@@ -672,7 +699,11 @@ static int ods2_get_block(struct inode *inode, sector_t iblock, struct buffer_he
 	int lbn;
 	struct super_block * sb=inode->i_sb;
 	ODS2SB * ods2p;
+#if LINUX_VERSION_CODE < 0x20614
 	ODS2FH                   *ods2fhp=(ODS2FH *)inode->u.generic_ip;
+#else
+	ODS2FH                   *ods2fhp=(ODS2FH *)inode->i_private;
+#endif
 	ODS2MAP * map, * newmap;
 	int pos;
 	struct hm2def * hm2;
@@ -698,7 +729,11 @@ static int ods2_get_block(struct inode *inode, sector_t iblock, struct buffer_he
 
 	sb = inode->i_sb;
 	ods2p = ODS2_SB(sb);
+#if LINUX_VERSION_CODE < 0x20614
 	ods2fhp = inode->u.generic_ip;
+#else
+	ods2fhp = inode->i_private;
+#endif
 
 	map = ods2fhp->map;
 	int factor = 1;

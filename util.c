@@ -11,7 +11,10 @@
  *
  */
 
+#include <linux/version.h>
+#if LINUX_VERSION_CODE < 0x20612
 #include <linux/config.h>
+#endif
 #ifdef TWOSIX
 #include <linux/module.h>
 #endif

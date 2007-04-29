@@ -598,11 +598,11 @@ void ods2_clear_inode(struct inode *inode);
 void ods2_delete_inode(struct inode *inode);
 void ods2_write_inode (struct inode *inode, int wait);
 void ods2_write_super (struct super_block * sb);
-int ods2_create (struct inode * dir, struct dentry * dentry, int mode);
-int ods2_link (struct dentry * old_dentry, struct inode * dir, struct dentry *dentry);
-int ods2_mkdir(struct inode * dir, struct dentry * dentry, int mode);
+static int ods2_create (struct inode * dir, struct dentry * dentry, int mode);
+static int ods2_link (struct dentry * old_dentry, struct inode * dir, struct dentry *dentry);
+static int ods2_mkdir(struct inode * dir, struct dentry * dentry, int mode);
 int ods2_add_link (struct dentry *dentry, struct inode *inode);
-int ods2_add_nondir(struct dentry *dentry, struct inode *inode);
+static int ods2_add_nondir(struct dentry *dentry, struct inode *inode);
 
 /*
   dir.c
