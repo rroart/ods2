@@ -55,8 +55,15 @@ struct file_operations ods2_dir_operations = {
 
 struct file_operations ods2_file_operations = {
 //	read:		ods2_read,
+#if LINUX_VERSION_CODE < 0x2061A
 	read:          generic_file_read,
 	write:          generic_file_write,
+#else
+	read:           do_sync_read,
+	write:          do_sync_write,
+        aio_read:       generic_file_aio_read,
+        aio_write:      generic_file_aio_write,
+#endif
 	readdir:	NULL,
 	llseek:		generic_file_llseek, // was ods2_llseek
 	open:		ods2_open_release,
@@ -90,8 +97,15 @@ struct file_operations ods2_dir_operations = {
 
 struct file_operations ods2_file_operations = {
 //	read=		ods2_read,
+#if LINUX_VERSION_CODE < 0x2061A
 	.read=          generic_file_read,
 	.write=          generic_file_write,
+#else
+	read:           do_sync_read,
+	write:          do_sync_write,
+        aio_read:       generic_file_aio_read,
+        aio_write:      generic_file_aio_write,
+#endif
 	//readdir=	NULL,
 	.llseek=		generic_file_llseek, // was ods2_llseek
 	.open=		ods2_open_release,
@@ -188,7 +202,11 @@ struct dentry *ods2_lookup(struct inode *dir, struct dentry *dentry
 							
 							ino = (dirv->u1.s2.u2.s3.fid$b_nmx << 16) | le16_to_cpu(dirv->u1.s2.u2.s3.fid$w_num);
 							brelse(bh);
+#if LINUX_VERSION_CODE < 0x2061A
 							if ((inode = iget(dir->i_sb, ino)) != NULL) {
+#else
+							if ((inode = ods2_iget(dir->i_sb, ino)) != NULL) {
+#endif
 								d_add(dentry, inode);
 								return NULL;
 							}
@@ -277,12 +295,36 @@ static int ods2_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, u
 #endif
 }
 
+#if LINUX_VERSION_CODE >= 0x2061A
+int __ods2_write_begin(struct file *file, struct address_space *mapping,
+		       loff_t pos, unsigned len, unsigned flags,
+		       struct page **pagep, void **fsdata)
+{
+	return block_write_begin(file, mapping, pos, len, flags, pagep, fsdata,
+				 ods2_get_block);
+}
+
+static int
+	ods2_write_begin(struct file *file, struct address_space *mapping,
+			 loff_t pos, unsigned len, unsigned flags,
+			 struct page **pagep, void **fsdata)
+{
+	*pagep = NULL;
+	return __ods2_write_begin(file, mapping, pos, len, flags, pagep,fsdata);
+}
+#endif
+
 struct address_space_operations ods2_aops = {
         readpage: ods2_readpage,
         writepage: ods2_writepage,
         sync_page: block_sync_page,
+#if LINUX_VERSION_CODE < 0x2061A
         prepare_write: ods2_prepare_write,
         commit_write: generic_commit_write,
+#else
+	write_begin: ods2_write_begin,
+	write_end: generic_write_end,
+#endif
         bmap: ods2_bmap,
 #ifndef TWOSIX
         direct_IO: ods2_direct_IO,
@@ -333,6 +375,7 @@ void ods2_read_inode(struct inode *inode) {
 					inode->i_mapping->a_ops = &ods2_aops;
 				} else {
 					inode->i_mode = S_IFREG;
+					//inode->i_op = &ods2_file_operations;
 					inode->i_fop = &ods2_file_operations;
 					inode->i_mapping->a_ops = &ods2_aops;
 				}
@@ -354,7 +397,9 @@ void ods2_read_inode(struct inode *inode) {
 				inode->i_mode |= vms2unixprot[(le16_to_cpu(fh2p->fh2$w_fileprot) >> 8) & 0x0f] << 3; /* group */
 				inode->i_mode |= vms2unixprot[(le16_to_cpu(fh2p->fh2$w_fileprot) >> 12) & 0x0f];     /* world => other */
 				
+#if LINUX_VERSION_CODE < 0x2061A
 				inode->i_blksize = 512;
+#endif
 				inode->i_blocks = ((le16_to_cpu(fatp->u1.s1.fat$w_hiblkh) << 16) | le16_to_cpu(fatp->u1.s1.fat$w_hiblkl));
 				inode->i_size = ((le16_to_cpu(fatp->u2.s1.fat$w_efblkh) << 16) | le16_to_cpu(fatp->u2.s1.fat$w_efblkl)) << 9;
 				if (inode->i_size > 0) { inode->i_size -= 512; }
@@ -390,6 +435,17 @@ void ods2_read_inode(struct inode *inode) {
 	}
 	printk("ODS2-fs error reading inode %x\n",fhlbn);
 	make_bad_inode(inode);
+}
+
+struct inode * ods2_iget(struct super_block * sb, unsigned long ino) {
+	struct inode *inode = iget_locked(sb, ino);
+	if (!inode)
+                return ERR_PTR(-ENOMEM);
+        if (!(inode->i_state & I_NEW))
+                return inode;
+	ods2_read_inode(inode);
+	unlock_new_inode(inode);
+	return inode;
 }
 
 /*
@@ -647,7 +703,13 @@ int ods2_make_empty(struct inode *inode, struct inode *parent)
 
         if (!page)
                 return -ENOMEM;
+#if LINUX_VERSION_CODE < 0x2061A
         err = mapping->a_ops->prepare_write(NULL, page, 0, 512);
+#else
+	unsigned chunk_size = 512;
+	err = __ods2_write_begin(NULL, page->mapping, 0, chunk_size, 0,
+				 &page, NULL);
+#endif
         if (err) {
 #ifdef TWOSIX
 		unlock_page(page);
@@ -668,8 +730,18 @@ int ods2_make_empty(struct inode *inode, struct inode *parent)
 	kunmap_atomic(buf, KM_USER0);
 #endif
 
-	struct inode *dir = page->mapping->host;
+#if LINUX_VERSION_CODE < 0x2061A
 	page->mapping->a_ops->commit_write(NULL, page, 0, 512);
+#else
+	struct inode *dir = mapping->host;
+        dir->i_version++;
+        block_write_end(NULL, page->mapping, 0, chunk_size, chunk_size, page, NULL);
+
+        if (chunk_size > dir->i_size) {
+                i_size_write(dir, chunk_size);
+                mark_inode_dirty(dir);
+        }
+#endif
         if (IS_SYNC(dir)) {
                 int err2;
 #ifdef TWOSIX

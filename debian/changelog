@@ -1,3 +1,9 @@
+ods2 (0.9.3.w9) unstable; urgency=low
+
+  * * did not compile on lenny
+
+ -- Roar Thronæs <roart@nvg.ntnu.no>  Wed, 16 May 2009 13:37:00 +0200
+
 ods2 (0.9.3.w8) unstable; urgency=low
 
   * * did not compile on dapper and etch

@@ -92,9 +92,13 @@ static struct super_operations ods2_sops = {
 };
 #else
 static struct super_operations ods2_sops = {
+#if LINUX_VERSION_CODE < 0x2061A
 	.read_inode=	ods2_read_inode,
+#endif
 	.write_inode=	ods2_write_inode,
+#if LINUX_VERSION_CODE < 0x2061A
 	.put_inode=	ods2_put_inode,
+#endif
 	.delete_inode=	ods2_delete_inode,
 	.clear_inode=	ods2_clear_inode,
 	.put_super=	ods2_put_super,
@@ -119,7 +123,11 @@ int ods2_read_bitmap(struct super_block *sb) {
 	struct buffer_head	   *bh;
 	struct inode		   *inode;
 	
+#if LINUX_VERSION_CODE < 0x2061A
 	if ((inode = iget(sb, 2)) != NULL) { /* this is BITMAP.SYS */
+#else
+	if ((inode = ods2_iget(sb, 2)) != NULL) { /* this is BITMAP.SYS */
+#endif
 #if LINUX_VERSION_CODE < 0x20614
 		ODS2FH			 *ods2fhp = (ODS2FH *)(inode->u.generic_ip);
 #else
@@ -275,13 +283,21 @@ static struct super_block * ods2_fill_super(struct super_block *sb, void *data, 
 
 			sb->s_op = &ods2_sops;
 
+#if LINUX_VERSION_CODE < 0x2061A
 			ods2p->indexf = iget(sb, 1); /* read INDEXF.SYS. */
+#else
+			ods2p->indexf = ods2_iget(sb, 1); /* read INDEXF.SYS. */
+#endif
 
 #if 0
 			extend_map(((ODS2FH *)ods2p->indexf->u.generic_ip)->map); // gross hack
 #endif
 			
+#if LINUX_VERSION_CODE < 0x2061A
 			sb->s_root = d_alloc_root(iget(sb, 4)); /* this is 000000.DIR;1 */
+#else
+			sb->s_root = d_alloc_root(ods2_iget(sb, 4)); /* this is 000000.DIR;1 */
+#endif
 			
 #ifndef TWOSIX
 			ods2p->ibh = bread(sb->s_dev, ods2p->hm2->hm2$l_ibmaplbn, ods2p->hm2->hm2$w_ibmapsize << 9);;

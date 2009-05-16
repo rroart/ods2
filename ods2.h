@@ -592,7 +592,11 @@ struct dentry *ods2_lookup(struct inode *dir, struct dentry *dentry
 // but this is not used?
 #endif
 );
+#if LINUX_VERSION_CODE < 0x2061A
 void ods2_read_inode(struct inode *inode);
+#else
+struct inode * ods2_iget(struct super_block *, unsigned long);
+#endif
 void ods2_put_inode(struct inode *inode);
 void ods2_clear_inode(struct inode *inode);
 void ods2_delete_inode(struct inode *inode);

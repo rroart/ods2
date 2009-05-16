@@ -49,7 +49,11 @@ int ods2_readdir(struct file *filp, void *dirent, filldir_t filldir) {
 	struct super_block	   *sb = inode->i_sb;
 	struct buffer_head	   *bh = NULL;
 	ODS2SB			   *ods2p = ODS2_SB(sb);
+#if LINUX_VERSION_CODE < 0x2061A
 	ODS2FH			   *ods2fhp = (ODS2FH *)inode->u.generic_ip;
+#else
+	ODS2FH			   *ods2fhp = (ODS2FH *)inode->i_private;
+#endif
 	ODS2FILE		   *ods2filep = (ODS2FILE *)filp->private_data;
 	loff_t			    pos = filp->f_pos;
 	u32			    vbn = (ods2filep->currec >> 9); /* get current VBN-1 to use */
@@ -497,7 +501,11 @@ unsigned insert_ent(struct inode * inode,unsigned eofblk,unsigned curblk,
     int inuse = 0;
     struct _fh2 * head;
     struct super_block * sb = inode->i_sb;
+#if LINUX_VERSION_CODE < 0x2061A
     ODS2FH                     *ods2fhp = (ODS2FH *)inode->u.generic_ip;
+#else
+    ODS2FH			   *ods2fhp = (ODS2FH *)inode->i_private;
+#endif
 
     zero_check_and_set(buffer);
     //printk("insert ent %x %x %x %x %x %x %s %x %x %x\n",inode,eofblk,curblk,buffer,dr,de,filename,filelen,version,fid);
@@ -670,7 +678,11 @@ unsigned delete_ent(struct inode * inode,unsigned curblk,
     struct _fh2 * head;
     struct buffer_head * bh;
     struct super_block * sb = inode->i_sb;
+#if LINUX_VERSION_CODE < 0x2061A
     ODS2FH                     *ods2fhp = (ODS2FH *)inode->u.generic_ip;
+#else
+    ODS2FH			   *ods2fhp = (ODS2FH *)inode->i_private;
+#endif
     direct_deletes++;
     ent = (VMSWORD(dr->dir$w_size) - STRUCT_DIR_SIZE
            - dr->dir$b_namecount + 3) / sizeof(struct _dir1);
@@ -719,7 +731,11 @@ unsigned return_ent(struct inode * inode,unsigned curblk,
     int version = VMSWORD(de->dir$w_version);
     int length = dr->dir$b_namecount;
     struct super_block * sb = inode->i_sb;
+#if LINUX_VERSION_CODE < 0x2061A
     ODS2FH                     *ods2fhp = (ODS2FH *)inode->u.generic_ip;
+#else
+    ODS2FH			   *ods2fhp = (ODS2FH *)inode->i_private;
+#endif
     char *ptr = resdsc->dsc$a_pointer;
     int outlen = resdsc->dsc$w_length;
     if (length > outlen) length = outlen;
@@ -761,7 +777,11 @@ unsigned search_ent(struct inode * inode,
     int searchlen,version,wildcard,wcc_flag;
     struct buffer_head * bh;
     struct super_block * sb = inode->i_sb;
+#if LINUX_VERSION_CODE < 0x2061A
     ODS2FH                     *ods2fhp = (ODS2FH *)inode->u.generic_ip;
+#else
+    ODS2FH			   *ods2fhp = (ODS2FH *)inode->i_private;
+#endif
     struct _fibdef *fib = (struct _fibdef *) fibdsc->dsc$a_pointer;
     direct_lookups++;
 

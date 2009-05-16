@@ -81,7 +81,11 @@ repeat:
 	  *mp++ = (start_pos * ods2p->hm2->hm2$w_cluster) >> 16;
 	  head->fh2$b_map_inuse += 4;
 	  ODS2SB *ods2p = ODS2_SB(sb);
+#if LINUX_VERSION_CODE < 0x2061A
 	  ODS2FH *ods2fhp = (ODS2FH *)ods2p->indexf->u.generic_ip;
+#else
+	  ODS2FH *ods2fhp = (ODS2FH *)ods2p->indexf->i_private;
+#endif
 	  void * oldmap = ods2fhp->map;
 	  ods2fhp->map = getmap(sb, head); // fix addmap later
 	  kfree(oldmap);
@@ -101,7 +105,9 @@ repeat:
 	inode->i_mode = mode;
 
 	inode->i_ino = ino;
+#if LINUX_VERSION_CODE < 0x2061A
 	inode->i_blksize = PAGE_SIZE;	/* This is the optimal IO size (for stat), not the fs block size */
+#endif
 	inode->i_blocks = 0;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 	insert_inode_hash(inode);
@@ -110,13 +116,22 @@ repeat:
 #else
 	inode->i_generation++; //suffices?
 #endif
+#if LINUX_VERSION_CODE < 0x2061A
 	inode->u.generic_ip = kmalloc(sizeof(ODS2FH), GFP_KERNEL);
 	memset(inode->u.generic_ip, 0, sizeof(ODS2FH));
+#else
+	inode->i_private = kmalloc(sizeof(ODS2FH), GFP_KERNEL);
+	memset(inode->i_private, 0, sizeof(ODS2FH));
+#endif
 	ODS2FH                 *ods2fhp;
 	FI2DEF                 *fi2p;
 	FATDEF                 *fatp;
 
+#if LINUX_VERSION_CODE < 0x2061A
 	ods2fhp = (ODS2FH *)inode->u.generic_ip;
+#else
+	ods2fhp = (ODS2FH *)inode->i_private;
+#endif
 	ods2fhp->map = kmalloc(sizeof(ODS2MAP),GFP_KERNEL);
 	memset(ods2fhp->map, 0, sizeof(ODS2MAP));
 	ods2fhp->ods2vari = NULL;
