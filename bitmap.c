@@ -100,8 +100,13 @@ repeat:
 
 	mark_buffer_dirty(ods2p->bh);
 	sb->s_dirt = 1;
+#if LINUX_VERSION_CODE < 0x2061F
 	inode->i_uid = current->fsuid;
 	inode->i_gid = current->fsgid;
+#else
+	inode->i_uid = 0;
+	inode->i_gid = 0;
+#endif
 	inode->i_mode = mode;
 
 	inode->i_ino = ino;

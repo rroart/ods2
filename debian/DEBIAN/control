@@ -3,7 +3,7 @@ Section: misc
 Priority: optional
 Maintainer: Roar Thronæs <roart@nvg.ntnu.no>
 Build-Depends: debhelper (>> 4.0)
-Version: 0.9.3.w9
+Version: 0.9.3.w10
 Description: Module for the ODS-2 file system
  This package contains the module for the ODS-2 file system.
 
@@ -11,6 +11,6 @@ Package: ods2-source
 Architecture: all
 Depends: module-assistant
 Suggests: fakeroot
-Version: 0.9.3.w9
+Version: 0.9.3.w10
 Description: Source for the ODS-2 file system
  This package contains the source for the ODS-2 file system.
