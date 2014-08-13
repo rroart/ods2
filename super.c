@@ -99,8 +99,12 @@ static struct super_operations ods2_sops = {
 #if LINUX_VERSION_CODE < 0x2061A
 	.put_inode=	ods2_put_inode,
 #endif
+#if LINUX_VERSION_CODE < 0x30000
 	.delete_inode=	ods2_delete_inode,
 	.clear_inode=	ods2_clear_inode,
+#else
+	.evict_inode=   ods2_clear_inode,
+#endif
 	.put_super=	ods2_put_super,
 	.write_super=	ods2_write_super,
 	.statfs=		ods2_statfs,
@@ -409,6 +413,7 @@ static DECLARE_FSTYPE_DEV(ods2_fs_type, "ods2", ods2_read_super);
 #ifndef LINUX_VERSION_CODE
 #error
 #endif
+#if LINUX_VERSION_CODE < 0x30000
 #if LINUX_VERSION_CODE < 0x20612
 static struct super_block *ods2_get_sb(struct file_system_type *fs_type,
 				       int flags, const char *dev_name, void *data)
@@ -422,13 +427,24 @@ static struct super_block *ods2_get_sb(struct file_system_type *fs_type,
         return get_sb_bdev(fs_type, flags, dev_name, data, ods2_fill_super, mnt);
 }
 #endif
+#else
+static struct dentry *ods2_mount(struct file_system_type *fs_type,
+				 int flags, const char *dev_name, void *data)
+{
+        return mount_bdev(fs_type, flags, dev_name, data, ods2_fill_super);
+}
+#endif
 
 static struct file_system_type ods2_fs_type = {
-#if 0
+#if LINUX_VERSION_CODE >= 0x30000
 	.owner          = THIS_MODULE,
 #endif
 	.name           = "ods2",
+#if LINUX_VERSION_CODE < 0x30000
 	.get_sb         = ods2_get_sb,
+#else
+	.mount          = ods2_mount,
+#endif
 	.kill_sb        = kill_block_super,
 	.fs_flags       = FS_REQUIRES_DEV,
 };

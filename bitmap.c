@@ -25,6 +25,11 @@
 
 #include "ods2.h"
 
+#if LINUX_VERSION_CODE >= 0x30000
+#define ext2_set_bit __test_and_set_bit_le
+#define ext2_find_first_zero_bit     find_first_zero_bit_le
+#endif
+
 struct inode * ods2_new_inode (const struct inode * dir, int mode)
 {
 	struct super_block * sb;

@@ -110,7 +110,9 @@ struct file_operations ods2_file_operations = {
 	.llseek=		generic_file_llseek, // was ods2_llseek
 	.open=		ods2_open_release,
 	.release=	ods2_open_release,
+#if LINUX_VERSION_CODE < 0x30000
 	.ioctl=		ods2_file_ioctl,
+#endif
 	//fsync=		NULL,
 };
 
@@ -280,10 +282,12 @@ static int ods2_readpage(struct file *file, struct page *page)
 {
         return block_read_full_page(page,ods2_get_block);
 }
+#if LINUX_VERSION_CODE < 0x2061A
 static int ods2_prepare_write(struct file *file, struct page *page, unsigned from, unsigned to)
 {
         return block_prepare_write(page,from,to,ods2_get_block);
 }
+#endif
 static int ods2_bmap(struct address_space *mapping, sector_t block)
 {
         return generic_block_bmap(mapping,block,ods2_get_block);
@@ -295,6 +299,7 @@ static int ods2_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, u
 #endif
 }
 
+#if LINUX_VERSION_CODE < 0x30000
 #if LINUX_VERSION_CODE >= 0x2061A
 int __ods2_write_begin(struct file *file, struct address_space *mapping,
 		       loff_t pos, unsigned len, unsigned flags,
@@ -313,11 +318,31 @@ static int
 	return __ods2_write_begin(file, mapping, pos, len, flags, pagep,fsdata);
 }
 #endif
+#else
+int __ods2_write_begin(struct file *file, struct address_space *mapping,
+		       loff_t pos, unsigned len, unsigned flags,
+		       struct page **pagep, void **fsdata)
+{
+	return block_write_begin(mapping, pos, len, flags, pagep,
+				 ods2_get_block);
+}
+
+static int
+	ods2_write_begin(struct file *file, struct address_space *mapping,
+			 loff_t pos, unsigned len, unsigned flags,
+			 struct page **pagep, void **fsdata)
+{
+	*pagep = NULL;
+	return __ods2_write_begin(file, mapping, pos, len, flags, pagep,fsdata);
+}
+#endif
 
 struct address_space_operations ods2_aops = {
         readpage: ods2_readpage,
         writepage: ods2_writepage,
+#if LINUX_VERSION_CODE < 0x30000
         sync_page: block_sync_page,
+#endif
 #if LINUX_VERSION_CODE < 0x2061A
         prepare_write: ods2_prepare_write,
         commit_write: generic_commit_write,
@@ -517,6 +542,9 @@ void ods2_clear_inode(struct inode *inode) {
   will run out of memory...
 */
 
+#if LINUX_VERSION_CODE >= 0x30000
+extern void clear_inode(struct inode *inode);
+#endif
 void ods2_delete_inode(struct inode *inode) {
 	clear_inode(inode);
 }
@@ -672,13 +700,17 @@ static int ods2_link (struct dentry * old_dentry, struct inode * dir,
 
 static inline void ods2_inc_count(struct inode *inode)
 {
+#if LINUX_VERSION_CODE < 0x30000
         inode->i_nlink++;
+#endif
         mark_inode_dirty(inode);
 }
 
 static inline void ods2_dec_count(struct inode *inode)
 {
+#if LINUX_VERSION_CODE < 0x30000
         inode->i_nlink--;
+#endif
         mark_inode_dirty(inode);
 }
 

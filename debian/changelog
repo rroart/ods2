@@ -1,3 +1,9 @@
+ods2 (0.9.3.w11) unstable; urgency=low
+
+  * * Debian 7 3.2
+
+ -- Roar Thronæs <roart@nvg.ntnu.no>  Wed, 13 Aug 2014 13:37:00 +0200
+
 ods2 (0.9.3.w10) unstable; urgency=low
 
   * * did not compile on 2.6.31 amd64

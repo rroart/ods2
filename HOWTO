@@ -1,3 +1,10 @@
+Debian 6 and 7:
+
+Install build-essential fakeroot module-assistant
+
+dpkg-buildpackage -us -uc
+dpkg-buildpackage -rfakeroot -uc -b
+
 For 2.6:
 
 Add a line
