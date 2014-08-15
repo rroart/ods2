@@ -546,10 +546,14 @@ void ods2_clear_inode(struct inode *inode) {
 */
 
 #if LINUX_VERSION_CODE >= 0x30000
+// why was this not in 3.2?
 extern void clear_inode(struct inode *inode);
 #endif
 void ods2_delete_inode(struct inode *inode) {
+#if LINUX_VERSION_CODE >= 0x30000
+
 	clear_inode(inode);
+#endif
 }
 
 static int ods2_update_inode(struct inode * inode, int do_sync)
