@@ -550,7 +550,7 @@ void ods2_clear_inode(struct inode *inode) {
 extern void clear_inode(struct inode *inode);
 #endif
 void ods2_delete_inode(struct inode *inode) {
-#if LINUX_VERSION_CODE >= 0x30000
+#if LINUX_VERSION_CODE < 0x30000
 
 	clear_inode(inode);
 #endif
