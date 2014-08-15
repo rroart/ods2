@@ -12,22 +12,25 @@
  */
 
 #include <linux/version.h>
+#ifndef LINUX_VERSION_CODE
+#error
+#endif
 #if LINUX_VERSION_CODE < 0x20612
 #include <linux/config.h>
 #endif
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/fs.h>
-#ifdef TWOSIX
+#if LINUX_VERSION_CODE >= 0x20600
 #include <linux/buffer_head.h>
 #endif
 #include <linux/slab.h>
 #include <linux/init.h>
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 #include <linux/locks.h>
 #endif
 #include <linux/blkdev.h>
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 #include <asm/uaccess.h>
 #else
 #include <linux/statfs.h>
@@ -62,7 +65,7 @@ static void ods2_put_super(struct super_block *sb) {
   the information we were gathering during the mount into the buffer.
 */
 
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 int ods2_statfs(struct super_block *sb, struct statfs *buf) {
 	ODS2SB			   *ods2p = ODS2_SB (sb);
 
@@ -78,7 +81,7 @@ int ods2_statfs(struct super_block *sb, struct kstatfs *buf) {
 }
 #endif
 
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 static struct super_operations ods2_sops = {
 	read_inode:	ods2_read_inode,
 	write_inode:	ods2_write_inode,
@@ -181,7 +184,7 @@ int ods2_read_bitmap(struct super_block *sb) {
 				brelse(bh);
 				iput(inode);
 				lbn = vbn2lbn(sb, ods2fhp->map, 2);
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 				ods2p->sbh = bread(sb->s_dev, lbn, (scb->scb$l_volsize/(512*8*scb->scb$w_cluster)+1)<<9);
 #else
 				ods2p->sbh = __bread(sb->s_bdev, lbn, (scb->scb$l_volsize/(512*8*scb->scb$w_cluster)+1)<<9);
@@ -233,7 +236,7 @@ int ods2_read_ibitmap(struct super_block *sb) {
   is mounted.
 */
 
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 static struct super_block * ods2_read_super(struct super_block *sb, void *data, int silent)
 #else
 static struct super_block * ods2_fill_super(struct super_block *sb, void *data, int silent)
@@ -242,7 +245,7 @@ static struct super_block * ods2_fill_super(struct super_block *sb, void *data, 
 	struct buffer_head	   *bh;
 	ODS2SB			   *ods2p;
 
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 	sb_set_blocksize(sb, get_hardsect_size(sb->s_dev));
 #else
 	sb_min_blocksize(sb, 512);
@@ -303,7 +306,7 @@ static struct super_block * ods2_fill_super(struct super_block *sb, void *data, 
 			sb->s_root = d_alloc_root(ods2_iget(sb, 4)); /* this is 000000.DIR;1 */
 #endif
 			
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 			ods2p->ibh = bread(sb->s_dev, ods2p->hm2->hm2$l_ibmaplbn, ods2p->hm2->hm2$w_ibmapsize << 9);;
 #else
 			ods2p->ibh = __bread(sb->s_bdev, ods2p->hm2->hm2$l_ibmaplbn, ods2p->hm2->hm2$w_ibmapsize << 9);;
@@ -344,7 +347,7 @@ static struct super_block * ods2_fill_super(struct super_block *sb, void *data, 
 					memcpy(volowner, ods2p->hm2->hm2$t_ownername, 12);
 					volowner[12] = 0;
 					printk("ODS2-fs This is a valid ODS2 file system with format /%s/ and volume name /%s/ and owner /%s/\n", format, volname, volowner);
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 					return sb;
 #else
 					return 0;
@@ -361,7 +364,7 @@ static struct super_block * ods2_fill_super(struct super_block *sb, void *data, 
 		kfree(ODS2_SB(sb));
 #endif
 	}
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 	return NULL;
 #else
 	return -EINVAL;
@@ -407,12 +410,9 @@ void ods2_write_super (struct super_block * sb)
         sb->s_dirt = 0;
 }
 
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 static DECLARE_FSTYPE_DEV(ods2_fs_type, "ods2", ods2_read_super);
 #else
-#ifndef LINUX_VERSION_CODE
-#error
-#endif
 #if LINUX_VERSION_CODE < 0x30000
 #if LINUX_VERSION_CODE < 0x20612
 static struct super_block *ods2_get_sb(struct file_system_type *fs_type,

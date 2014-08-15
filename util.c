@@ -15,18 +15,18 @@
 #if LINUX_VERSION_CODE < 0x20612
 #include <linux/config.h>
 #endif
-#ifdef TWOSIX
+#if LINUX_VERSION_CODE >= 0x20600
 #include <linux/module.h>
 #endif
 #include <linux/string.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/init.h>
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 #include <linux/locks.h>
 #endif
 #include <linux/blkdev.h>
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 #include <asm/uaccess.h>
 #else
 #include <linux/buffer_head.h>

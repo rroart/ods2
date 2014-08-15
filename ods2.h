@@ -11,7 +11,11 @@
  *
  */
 
-#ifdef TWOSIX
+#include <linux/version.h>
+#ifndef LINUX_VERSION_CODE
+#error
+#endif
+#if LINUX_VERSION_CODE >= 0x20600
 #include <linux/statfs.h>
 #endif
 
@@ -459,7 +463,7 @@ typedef struct ods2fh {
 #define SB$M_RAW	   8
 #define SB$M_LOWERCASE	   16
 
-#ifdef TWOSIX
+#if LINUX_VERSION_CODE >= 0x20600
 #define ODS2_SB(sb) (sb->s_fs_info)
 #else
 #define ODS2_SB(sb) ((struct ods2sb *)(sb->u.generic_sbp))
@@ -521,7 +525,7 @@ typedef struct ods2sb {
 	struct inode		 *indexf;  /* INDEXF.SYS */
 	u8			 *ibitmap; /* index file header bitmap */
 	struct buffer_head * sbh;
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 	struct statfs		  statfs;
 #else
 	struct kstatfs            statfs;
@@ -587,7 +591,7 @@ char * my_strstr (const char *, const char *);
 */
 
 struct dentry *ods2_lookup(struct inode *dir, struct dentry *dentry
-#ifdef TWOSIX
+#if LINUX_VERSION_CODE >= 0x20600
 , struct nameidata *nd
 // but this is not used?
 #endif

@@ -2,10 +2,13 @@
 // Author. Roar Thronæs.
 
 #include <linux/version.h>
+#ifndef LINUX_VERSION_CODE
+#error
+#endif
 #if LINUX_VERSION_CODE < 0x20612
 #include <linux/config.h>
 #endif
-#ifdef TWOSIX
+#if LINUX_VERSION_CODE >= 0x20600
 #include <linux/module.h>
 #endif
 #include <linux/string.h>
@@ -13,11 +16,11 @@
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/init.h>
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 #include <linux/locks.h>
 #endif
 #include <linux/blkdev.h>
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 #include <asm/uaccess.h>
 #else
 #include <linux/buffer_head.h>
@@ -121,7 +124,7 @@ repeat:
 	inode->i_blocks = 0;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 	insert_inode_hash(inode);
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 	inode->i_generation = event++;
 #else
 	inode->i_generation++; //suffices?
@@ -155,7 +158,7 @@ repeat:
 	fatp->fat$l_efblk=VMSSWAP((1));
 	fatp->fat$w_ffbyte=0;
 
-#ifdef TWOSIX
+#if LINUX_VERSION_CODE >= 0x20600
 #if LINUX_VERSION_CODE < 0x20612
 	inode->i_bdev=sb->s_bdev;
 #endif

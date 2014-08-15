@@ -12,10 +12,13 @@
  */
 
 #include <linux/version.h>
+#ifndef LINUX_VERSION_CODE
+#error
+#endif
 #if LINUX_VERSION_CODE < 0x20612
 #include <linux/config.h>
 #endif
-#ifdef TWOSIX
+#if LINUX_VERSION_CODE >= 0x20600
 #include <linux/module.h>
 #endif
 #include <linux/string.h>
@@ -23,17 +26,17 @@
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/init.h>
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 #include <linux/locks.h>
 #else
 #include <linux/buffer_head.h>
 #endif
 #include <linux/blkdev.h>
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 #include <asm/uaccess.h>
 #endif
 
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 typedef long sector_t;
 #endif
 
@@ -41,7 +44,7 @@ static void ods2_inc_count(struct inode *inode);
 
 #include "ods2.h"
 
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 struct file_operations ods2_dir_operations = {
 	read:		NULL,
 	readdir:	ods2_readdir,
@@ -130,7 +133,7 @@ struct inode_operations ods2_dir_inode_operations = {
 #endif
 
 struct dentry *ods2_lookup(struct inode *dir, struct dentry *dentry
-#ifdef TWOSIX
+#if LINUX_VERSION_CODE >= 0x20600
 , struct nameidata *nd
 // but this is not used?
 #endif
@@ -267,7 +270,7 @@ char unsigned vms2unixprot[] = {       /* ODS2 prot */
 static int ods2_get_block(struct inode *inode, sector_t iblock, struct buffer_head *
 			  bh_result, int create);
 
-#ifdef TWOSIX
+#if LINUX_VERSION_CODE >= 0x20600
 static int ods2_writepage(struct page *page,void * wbc)
 {
         return block_write_full_page(page,ods2_get_block,wbc);
@@ -294,7 +297,7 @@ static int ods2_bmap(struct address_space *mapping, sector_t block)
 }
 static int ods2_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsigned long blocknr, int blocksize)
 {
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
         return generic_direct_IO(rw, inode, iobuf, blocknr, blocksize, ods2_get_block);
 #endif
 }
@@ -351,7 +354,7 @@ struct address_space_operations ods2_aops = {
 	write_end: generic_write_end,
 #endif
         bmap: ods2_bmap,
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
         direct_IO: ods2_direct_IO,
 #endif
 };
@@ -408,7 +411,7 @@ void ods2_read_inode(struct inode *inode) {
 				inode->i_uid = le16_to_cpu(fh2p->u5.s1.fh2$w_mem);
 				inode->i_gid = le16_to_cpu(fh2p->u5.s1.fh2$w_grp);
 
-#ifndef TWOSIX				
+#if LINUX_VERSION_CODE < 0x20600				
 				inode->i_ctime = (long)vms2unixtime(fi2p->fi2$q_credate);
 				inode->i_mtime = (long)vms2unixtime(fi2p->fi2$q_revdate);
 				inode->i_atime = (long)vms2unixtime(fi2p->fi2$q_revdate);
@@ -440,7 +443,7 @@ void ods2_read_inode(struct inode *inode) {
 				}
 				
 				ods2fhp->parent = (fh2p->u6.s1.fid$b_nmx << 16) |  le16_to_cpu(fh2p->u6.s1.fid$w_num);
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 				inode->i_version = ++event;
 #else
 				inode->i_version++; // suffices?
@@ -743,13 +746,13 @@ int ods2_make_empty(struct inode *inode, struct inode *parent)
 				 &page, NULL);
 #endif
         if (err) {
-#ifdef TWOSIX
+#if LINUX_VERSION_CODE >= 0x20600
 		unlock_page(page);
 #endif
                 goto fail;
 	}
 
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
         buf = page_address(page);
 #else
 	buf = kmap_atomic(page, KM_USER0);
@@ -758,7 +761,7 @@ int ods2_make_empty(struct inode *inode, struct inode *parent)
 	memset(buf, 0, 512);
 	buf[0]=0xffff;
 
-#ifdef TWOSIX
+#if LINUX_VERSION_CODE >= 0x20600
 	kunmap_atomic(buf, KM_USER0);
 #endif
 
@@ -776,7 +779,7 @@ int ods2_make_empty(struct inode *inode, struct inode *parent)
 #endif
         if (IS_SYNC(dir)) {
                 int err2;
-#ifdef TWOSIX
+#if LINUX_VERSION_CODE >= 0x20600
                 err = write_one_page(page, 1);
 #else
                 err = writeout_one_page(page);
@@ -788,7 +791,7 @@ int ods2_make_empty(struct inode *inode, struct inode *parent)
 
 
 fail:
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
         UnlockPage(page);
 #else
 	unlock_page(page);
@@ -817,7 +820,7 @@ static int ods2_get_block(struct inode *inode, sector_t iblock, struct buffer_he
 	lbn = vbn2lbn(sb, ods2fhp->map, vbn+1);
 
 	if (lbn > 0) {
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 		bh_result->b_dev = inode->i_dev;
 #else
 		bh_result->b_bdev = inode->i_bdev;
@@ -881,7 +884,7 @@ static int ods2_get_block(struct inode *inode, sector_t iblock, struct buffer_he
 
  map_set:
 
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 	bh_result->b_dev = inode->i_dev;
 #else
 	bh_result->b_bdev = inode->i_bdev;

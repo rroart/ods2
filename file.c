@@ -15,21 +15,24 @@
  */
 
 #include <linux/version.h>
+#ifndef LINUX_VERSION_CODE
+#error
+#endif
 #if LINUX_VERSION_CODE < 0x20612
 #include <linux/config.h>
 #endif
-#ifdef TWOSIX
+#if LINUX_VERSION_CODE >= 0x20600
 #include <linux/module.h>
 #endif
 #include <linux/string.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/init.h>
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 #include <linux/locks.h>
 #endif
 #include <linux/blkdev.h>
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 #include <asm/uaccess.h>
 #else
 #include <linux/buffer_head.h>
@@ -470,7 +473,7 @@ loff_t ods2_llseek_stream(struct file *filp, loff_t loff, int seek) {
 		}
 	}
 	filp->f_pos = offs;
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 // check this?
 	filp->f_reada = 0;
 #endif
@@ -598,7 +601,7 @@ loff_t ods2_llseek_variable(struct file *filp, loff_t loff, int seek) {
 				ods2filep->reclen = 65535;
 				up(&(ods2vari->sem));
 				filp->f_pos = coffs;
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 // check this?
 				filp->f_reada = 0;
 #endif
@@ -615,7 +618,7 @@ loff_t ods2_llseek_variable(struct file *filp, loff_t loff, int seek) {
 				ods2filep->reclen = 65535;
 				up(&(ods2vari->sem));
 				filp->f_pos = coffs;
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 // check this?
 				filp->f_reada = 0;
 #endif
@@ -633,7 +636,7 @@ loff_t ods2_llseek_variable(struct file *filp, loff_t loff, int seek) {
 			ods2filep->reclen = reclen;
 			up(&(ods2vari->sem));
 			filp->f_pos = coffs;
-#ifndef TWOSIX
+#if LINUX_VERSION_CODE < 0x20600
 // check this?
 			filp->f_reada = 0;
 #endif
