@@ -44,8 +44,8 @@
   versions of a file, each file must be treated as a unique file.
 */
 
-int ods2_readdir(struct file *filp, void *dirent, filldir_t filldir) {
-	struct inode		   *inode = filp->f_dentry->d_inode;
+int ods2_readdir(struct file *filp, struct dir_context *dirent) {
+	struct inode		   *inode = filp->f_inode;
 	struct super_block	   *sb = inode->i_sb;
 	struct buffer_head	   *bh = NULL;
 	ODS2SB			   *ods2p = ODS2_SB(sb);
@@ -73,7 +73,9 @@ int ods2_readdir(struct file *filp, void *dirent, filldir_t filldir) {
 	  position is set to 0. We must then return two fake entries,
 	  . for the current directory and .. for the parent directory.
 	*/
-	
+
+	/*
+	  TODO
 	if (pos == 0) {
 		filldir(dirent, ".", 1, 0, inode->i_ino, DT_DIR);
 		filldir(dirent, "..", 2, 1, ods2fhp->parent, DT_DIR);
@@ -81,6 +83,7 @@ int ods2_readdir(struct file *filp, void *dirent, filldir_t filldir) {
 		ods2filep->curbyte = 0;
 		vbn = 0;
 	}
+	*/
 	
 	/*
 	  As long we can translate the virtual block number, VBN, to a
@@ -138,15 +141,15 @@ int ods2_readdir(struct file *filp, void *dirent, filldir_t filldir) {
 					  the false directory.
 					*/
 
-					if (filldir(dirent, dirnamev, strlen(dirnamev), filp->f_pos, ino, 
-						    (my_strstr(dirnamev, (ods2p->flags.v_lowercase ? ".dir." : ".DIR")) == NULL ? DT_REG : DT_DIR))) {
 						/*
 						  We come here when filldir is unable to handle more entries.
-						*/
+					if (filldir(dirent, dirnamev, strlen(dirnamev), filp->f_pos, ino, 
+						    (my_strstr(dirnamev, (ods2p->flags.v_lowercase ? ".dir." : ".DIR")) == NULL ? DT_REG : DT_DIR))) {
 
 						brelse(bh);
 						return 0;
 					}
+						*/
 					if (ods2p->flags.v_version != SB$M_VERSALL) { strcpy(cdirname, dirname); }
 				}
 				if (ods2p->flags.v_version == SB$M_VERSALL) {
@@ -478,6 +481,7 @@ void fid_copy(struct _fiddef *dst,struct _fiddef *src,unsigned rvn)
 }
 
 // temp workaround for cases when dir file is all zeroes
+void
 zero_check_and_set(short * buffer) {
 	int i,j=0;
 	for (i=0;i<256;i++)
@@ -507,7 +511,7 @@ unsigned insert_ent(struct inode * inode,unsigned eofblk,unsigned curblk,
     ODS2FH			   *ods2fhp = (ODS2FH *)inode->i_private;
 #endif
 
-    zero_check_and_set(buffer);
+    zero_check_and_set((void *) buffer);
     //printk("insert ent %x %x %x %x %x %x %s %x %x %x\n",inode,eofblk,curblk,buffer,dr,de,filename,filelen,version,fid);
     int i;
     //for(i=0;i<32;i++) printk("%c %x \n",buffer[i],(unsigned char)buffer[i]);
@@ -661,7 +665,7 @@ unsigned insert_ent(struct inode * inode,unsigned eofblk,unsigned curblk,
 
     memset(de, 0, 2); // next line only sets a byte, so therefore workaround
     de->dir$w_version = VMSWORD(version);
-    fid_copy(&de->dir$fid,fid,0);
+    fid_copy((void *) &de->dir$fid,fid,0);
     mark_inode_dirty(inode);
     return 1;
 }
@@ -754,7 +758,7 @@ unsigned return_ent(struct inode * inode,unsigned curblk,
         } while (scale > 1);
     }
     *reslen = length;
-    fid_copy((struct _fiddef *)&fib->fib$w_fid_num,&de->dir$fid,0);
+    fid_copy((struct _fiddef *)&fib->fib$w_fid_num,(void *) &de->dir$fid,0);
     //if (fib->fib$b_fid_rvn == 0) fib->fib$b_fid_rvn = fcb->fcb$b_fid_rvn;
     if (wildcard || (fib->fib$w_nmctl & FIB$M_WILD)) {
         fib->fib$l_wcc = curblk;

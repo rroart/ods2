@@ -586,12 +586,7 @@ char * my_strstr (const char *, const char *);
   inode.c
 */
 
-struct dentry *ods2_lookup(struct inode *dir, struct dentry *dentry
-#ifdef TWOSIX
-, struct nameidata *nd
-// but this is not used?
-#endif
-);
+struct dentry *ods2_lookup(struct inode *dir, struct dentry *dentry, unsigned int flags);
 #if LINUX_VERSION_CODE < 0x2061A
 void ods2_read_inode(struct inode *inode);
 #else
@@ -600,11 +595,11 @@ struct inode * ods2_iget(struct super_block *, unsigned long);
 void ods2_put_inode(struct inode *inode);
 void ods2_clear_inode(struct inode *inode);
 void ods2_delete_inode(struct inode *inode);
-void ods2_write_inode (struct inode *inode, int wait);
+int ods2_write_inode (struct inode *inode, struct writeback_control *);
 void ods2_write_super (struct super_block * sb);
-static int ods2_create (struct inode * dir, struct dentry * dentry, int mode);
+static int ods2_create (struct user_namespace * ns, struct inode * dir, struct dentry * dentry, umode_t mode, bool b);
 static int ods2_link (struct dentry * old_dentry, struct inode * dir, struct dentry *dentry);
-static int ods2_mkdir(struct inode * dir, struct dentry * dentry, int mode);
+static int ods2_mkdir(struct user_namespace * ns, struct inode * dir, struct dentry * dentry, umode_t mode);
 int ods2_add_link (struct dentry *dentry, struct inode *inode);
 static int ods2_add_nondir(struct dentry *dentry, struct inode *inode);
 
@@ -612,7 +607,7 @@ static int ods2_add_nondir(struct dentry *dentry, struct inode *inode);
   dir.c
 */
 
-int ods2_readdir(struct file *filp, void *dirent, filldir_t filldir);
+int ods2_readdir(struct file *filp, struct dir_context *dirent);
 
 /*
   file.c

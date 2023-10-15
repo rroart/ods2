@@ -169,7 +169,7 @@ ODS2MAP *getmap(struct super_block *sb, FH2DEF *fh2p) {
 
 
 struct buffer_head *getfilebh(struct file *filp,  u32 vbn) {
-	struct inode		   *inode = filp->f_dentry->d_inode;
+	struct inode		   *inode = filp->f_inode;
 	struct super_block	   *sb = inode->i_sb;
 #if LINUX_VERSION_CODE < 0x2061A
 	ODS2FH			   *ods2fhp = (ODS2FH *)inode->u.generic_ip;
@@ -351,6 +351,7 @@ int	ods2_write_map(struct fh2def * fh2p,ODS2MAP * map) {
 	}
  out:
 	{}
+	return 0; // TODO
 }
 
 #if 0

@@ -1,3 +1,6 @@
+For 5/6:
+make -C /lib/modules/`uname -r`/build M=$PWD
+
 For 2.6:
 
 Add a line

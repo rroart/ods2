@@ -85,8 +85,8 @@ struct inode_operations ods2_dir_inode_operations = {
 };
 #else
 struct file_operations ods2_dir_operations = {
-	//.read=		NULL,
-	.readdir=	ods2_readdir,
+	.read=		generic_read_dir,
+	.iterate=	ods2_readdir,
 	.open=		ods2_open_release,
 	.release=	ods2_open_release,
 	//ioctl=		NULL,
@@ -101,16 +101,16 @@ struct file_operations ods2_file_operations = {
 	.read=          generic_file_read,
 	.write=          generic_file_write,
 #else
-	read:           do_sync_read,
-	write:          do_sync_write,
-        aio_read:       generic_file_aio_read,
-        aio_write:      generic_file_aio_write,
+	read:           NULL, // TODO do_sync_read,
+	write:          NULL, // TODO do_sync_write,
+        //aio_read:       generic_file_aio_read,
+        //aio_write:      generic_file_aio_write,
 #endif
 	//readdir=	NULL,
 	.llseek=		generic_file_llseek, // was ods2_llseek
 	.open=		ods2_open_release,
 	.release=	ods2_open_release,
-	.ioctl=		ods2_file_ioctl,
+	//.ioctl=		ods2_file_ioctl,
 	//fsync=		NULL,
 };
 
@@ -127,12 +127,7 @@ struct inode_operations ods2_dir_inode_operations = {
 };
 #endif
 
-struct dentry *ods2_lookup(struct inode *dir, struct dentry *dentry
-#ifdef TWOSIX
-, struct nameidata *nd
-// but this is not used?
-#endif
-)
+struct dentry *ods2_lookup(struct inode *dir, struct dentry *dentry, unsigned int flags)
 {
 	struct super_block	   *sb = dir->i_sb;
 	ODS2SB			   *ods2p = ODS2_SB(sb);
@@ -278,13 +273,13 @@ static int ods2_writepage(struct page *page)
 #endif
 static int ods2_readpage(struct file *file, struct page *page)
 {
-        return block_read_full_page(page,ods2_get_block);
+        return 0; // TODO block_read_full_page(page,ods2_get_block);
 }
 static int ods2_prepare_write(struct file *file, struct page *page, unsigned from, unsigned to)
 {
-        return block_prepare_write(page,from,to,ods2_get_block);
+        return 0; // TODO block_prepare_write(page,from,to,ods2_get_block);
 }
-static int ods2_bmap(struct address_space *mapping, sector_t block)
+static sector_t ods2_bmap(struct address_space *mapping, sector_t block)
 {
         return generic_block_bmap(mapping,block,ods2_get_block);
 }
@@ -293,6 +288,7 @@ static int ods2_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, u
 #ifndef TWOSIX
         return generic_direct_IO(rw, inode, iobuf, blocknr, blocksize, ods2_get_block);
 #endif
+	return 0;
 }
 
 #if LINUX_VERSION_CODE >= 0x2061A
@@ -300,24 +296,25 @@ int __ods2_write_begin(struct file *file, struct address_space *mapping,
 		       loff_t pos, unsigned len, unsigned flags,
 		       struct page **pagep, void **fsdata)
 {
-	return block_write_begin(file, mapping, pos, len, flags, pagep, fsdata,
+	return block_write_begin(mapping, pos, len, pagep,
 				 ods2_get_block);
 }
 
 static int
 	ods2_write_begin(struct file *file, struct address_space *mapping,
-			 loff_t pos, unsigned len, unsigned flags,
+			 loff_t pos, unsigned len,
 			 struct page **pagep, void **fsdata)
 {
 	*pagep = NULL;
+	unsigned flags = 0;
 	return __ods2_write_begin(file, mapping, pos, len, flags, pagep,fsdata);
 }
 #endif
 
 struct address_space_operations ods2_aops = {
-        readpage: ods2_readpage,
-        writepage: ods2_writepage,
-        sync_page: block_sync_page,
+        // TODO readpage: ods2_readpage,
+        // TODO writepage: ods2_writepage,
+        // TODO sync_page: block_sync_page,
 #if LINUX_VERSION_CODE < 0x2061A
         prepare_write: ods2_prepare_write,
         commit_write: generic_commit_write,
@@ -380,8 +377,8 @@ void ods2_read_inode(struct inode *inode) {
 					inode->i_mapping->a_ops = &ods2_aops;
 				}
 
-				inode->i_uid = le16_to_cpu(fh2p->u5.s1.fh2$w_mem);
-				inode->i_gid = le16_to_cpu(fh2p->u5.s1.fh2$w_grp);
+				inode->i_uid.val = le16_to_cpu(fh2p->u5.s1.fh2$w_mem);
+				inode->i_gid.val = le16_to_cpu(fh2p->u5.s1.fh2$w_grp);
 
 #ifndef TWOSIX				
 				inode->i_ctime = (long)vms2unixtime(fi2p->fi2$q_credate);
@@ -418,7 +415,7 @@ void ods2_read_inode(struct inode *inode) {
 #ifndef TWOSIX
 				inode->i_version = ++event;
 #else
-				inode->i_version++; // suffices?
+				// TODO inode->i_version++; // suffices?
 #endif
 				bforget(bh);
 				return;
@@ -542,7 +539,7 @@ static int ods2_update_inode(struct inode * inode, int do_sync)
 	}
 
 	printk("bh %x %x\n",bh,fhlbn);
-	fh2p = bh->b_data;
+	fh2p = (void *) bh->b_data;
 	memset(fh2p, 0, 512);
 	printk("fh2p %x\n",fh2p);
 	
@@ -578,8 +575,8 @@ static int ods2_update_inode(struct inode * inode, int do_sync)
 	if (inode->i_mode&S_IFDIR)
 		printk("read a dir2\n");
 
-	fh2p->u5.s1.fh2$w_mem=cpu_to_le16(inode->i_uid);
-	fh2p->u5.s1.fh2$w_grp=cpu_to_le16(inode->i_gid);
+	fh2p->u5.s1.fh2$w_mem=cpu_to_le16(inode->i_uid.val);
+	fh2p->u5.s1.fh2$w_grp=cpu_to_le16(inode->i_gid.val);
 		
 #if 0		
 	fi2p->fi2$q_credate=unix2vmstime(inode->i_ctime);
@@ -621,13 +618,13 @@ static int ods2_update_inode(struct inode * inode, int do_sync)
 				
 	ods2fhp->parent = (fh2p->u6.s1.fid$b_nmx << 16) |  le16_to_cpu(fh2p->u6.s1.fid$w_num);
 
-	fh2p->fh2$w_checksum = VMSWORD(checksum(fh2p));
+	fh2p->fh2$w_checksum = VMSWORD(checksum((void *)fh2p));
 
 	ods2_write_super(inode->i_sb);
 	
 	mark_buffer_dirty(bh);
 	if (do_sync) {
-		ll_rw_block (WRITE, 1, &bh);
+		// TODO ll_rw_block (WRITE, 1, &bh);
 		wait_on_buffer (bh);
 		if (buffer_req(bh) && !buffer_uptodate(bh)) {
 			printk ("IO error syncing ods2 inode ["
@@ -640,10 +637,10 @@ static int ods2_update_inode(struct inode * inode, int do_sync)
 	return err;
 }
 
-void ods2_write_inode (struct inode * inode, int wait)
+int ods2_write_inode (struct inode * inode, struct writeback_control * wbc)
 {
         //lock_kernel();
-        ods2_update_inode (inode, wait);
+        return ods2_update_inode (inode, 0);
         //unlock_kernel();
 }
 
@@ -663,7 +660,7 @@ static int ods2_link (struct dentry * old_dentry, struct inode * dir,
 	if (inode->i_nlink >= 42 /*ODS2_LINK_MAX not yet? */)
 		return -EMLINK;
 
-	inode->i_ctime = CURRENT_TIME;
+	// TODO inode->i_ctime = CURRENT_TIME;
 	ods2_inc_count(inode);
 	atomic_inc(&inode->i_count);
 
@@ -672,13 +669,13 @@ static int ods2_link (struct dentry * old_dentry, struct inode * dir,
 
 static inline void ods2_inc_count(struct inode *inode)
 {
-        inode->i_nlink++;
+        // TODO inode->i_nlink++;
         mark_inode_dirty(inode);
 }
 
 static inline void ods2_dec_count(struct inode *inode)
 {
-        inode->i_nlink--;
+        // TODO inode->i_nlink--;
         mark_inode_dirty(inode);
 }
 
@@ -720,21 +717,21 @@ int ods2_make_empty(struct inode *inode, struct inode *parent)
 #ifndef TWOSIX
         buf = page_address(page);
 #else
-	buf = kmap_atomic(page, KM_USER0);
+	buf = kmap_local_page(page);
 #endif
 
 	memset(buf, 0, 512);
 	buf[0]=0xffff;
 
 #ifdef TWOSIX
-	kunmap_atomic(buf, KM_USER0);
+	kunmap_local(buf);
 #endif
 
 #if LINUX_VERSION_CODE < 0x2061A
 	page->mapping->a_ops->commit_write(NULL, page, 0, 512);
 #else
 	struct inode *dir = mapping->host;
-        dir->i_version++;
+        // TODO dir->i_version++;
         block_write_end(NULL, page->mapping, 0, chunk_size, chunk_size, page, NULL);
 
         if (chunk_size > dir->i_size) {
@@ -745,7 +742,7 @@ int ods2_make_empty(struct inode *inode, struct inode *parent)
         if (IS_SYNC(dir)) {
                 int err2;
 #ifdef TWOSIX
-                err = write_one_page(page, 1);
+                put_page(page);
 #else
                 err = writeout_one_page(page);
                 err2 = waitfor_one_page(page);
@@ -761,7 +758,7 @@ fail:
 #else
 	unlock_page(page);
 #endif
-        page_cache_release(page);
+        put_page(page);
         return err;
 }
 
@@ -788,7 +785,6 @@ static int ods2_get_block(struct inode *inode, sector_t iblock, struct buffer_he
 #ifndef TWOSIX
 		bh_result->b_dev = inode->i_dev;
 #else
-		bh_result->b_bdev = inode->i_bdev;
 		bh_result->b_bdev = inode->i_sb->s_bdev;
 #endif
                 bh_result->b_blocknr = lbn;
@@ -852,7 +848,6 @@ static int ods2_get_block(struct inode *inode, sector_t iblock, struct buffer_he
 #ifndef TWOSIX
 	bh_result->b_dev = inode->i_dev;
 #else
-	bh_result->b_bdev = inode->i_bdev;
 	bh_result->b_bdev = inode->i_sb->s_bdev;
 #endif
 	bh_result->b_blocknr = lbn;
@@ -860,12 +855,12 @@ static int ods2_get_block(struct inode *inode, sector_t iblock, struct buffer_he
 	return 0;
 }
 
-static int ods2_create (struct inode * dir, struct dentry * dentry, int mode)
+static int ods2_create (struct user_namespace * ns, struct inode * dir, struct dentry * dentry, umode_t mode, bool b)
 {
 	struct inode * inode = ods2_new_inode (dir, mode);
 	int err = PTR_ERR(inode);
 	if (!IS_ERR(inode)) {
-		inode->i_op = &ods2_file_operations;
+		inode->i_op = (void *) &ods2_file_operations;
 		inode->i_fop = &ods2_file_operations;
 		inode->i_mapping->a_ops = &ods2_aops;
 		mark_inode_dirty(inode);
@@ -874,7 +869,7 @@ static int ods2_create (struct inode * dir, struct dentry * dentry, int mode)
 	return err;
 }
 
-static int ods2_mkdir(struct inode * dir, struct dentry * dentry, int mode)
+static int ods2_mkdir(struct user_namespace * ns, struct inode * dir, struct dentry * dentry, umode_t mode)
 {
 	struct inode * inode;
 	int err = -EMLINK;

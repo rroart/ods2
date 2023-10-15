@@ -40,22 +40,22 @@ struct inode * ods2_new_inode (const struct inode * dir, int mode)
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
 
-	lock_super (sb);
+	// TODO lock_super (sb);
 	ods2p = ODS2_SB(sb);
 repeat:
 	bh = ods2p->ibh;
 	if (IS_ERR(bh))
 		goto fail2;
 
-	i = ext2_find_first_zero_bit ((unsigned long *) bh->b_data,
+	i = find_first_zero_bit_le ((unsigned long *) bh->b_data,
 				      4096);
 	if (i >= 4096)
 		goto bad_count;
-	ext2_set_bit (i, bh->b_data);
+	__test_and_set_bit_le (i, bh->b_data);
 
 	mark_buffer_dirty(bh);
-	if (sb->s_flags & MS_SYNCHRONOUS) {
-		ll_rw_block (WRITE, 1, &bh);
+	if (sb->s_flags & SB_SYNCHRONOUS) {
+	  // TODO ll_rw_block (WRITE, 1, &bh);
 		wait_on_buffer (bh);
 	}
 
@@ -72,7 +72,7 @@ repeat:
 	  sts = bitmap_search(sb, &start_pos, &block_count);
 	  bitmap_modify(sb, start_pos, 1*20, 0);
 	  struct buffer_head * bh = sb_bread(sb, ods2p->hm2->hm2$l_ibmaplbn+ods2p->hm2->hm2$w_ibmapsize);
-	  FH2DEF * head = bh->b_data;
+	  FH2DEF * head = (void *) bh->b_data;
 	  unsigned short *mp,*map;
 	  map = mp = (unsigned short *) head + head->fh2$b_mpoffset + head->fh2$b_map_inuse;
 	  *mp++ = (3 << 14) | ((block_count *ods2p->hm2->hm2$w_cluster - 1) >> 16);
@@ -94,18 +94,18 @@ repeat:
 	  // not this? head->fh2$w_recattr.fat$l_hiblk = VMSSWAP(fcb->fcb$l_efblk * ods2p->hm2->hm2$w_cluster);
 	  if (head->fh2$l_highwater)
 	    head->fh2$l_highwater += block_count * ods2p->hm2->hm2$w_cluster;;
-	  head->fh2$w_checksum = VMSWORD(checksum(head));
+	  head->fh2$w_checksum = VMSWORD(checksum((void *) head));
 	  mark_buffer_dirty(bh);
 	}
 
 	mark_buffer_dirty(ods2p->bh);
-	sb->s_dirt = 1;
+	// TODO sb->s_dirt = 1;
 #if LINUX_VERSION_CODE < 0x2061F
 	inode->i_uid = current->fsuid;
 	inode->i_gid = current->fsgid;
 #else
-	inode->i_uid = 0;
-	inode->i_gid = 0;
+	inode->i_uid.val = 0;
+	inode->i_gid.val = 0;
 #endif
 	inode->i_mode = mode;
 
@@ -114,7 +114,7 @@ repeat:
 	inode->i_blksize = PAGE_SIZE;	/* This is the optimal IO size (for stat), not the fs block size */
 #endif
 	inode->i_blocks = 0;
-	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
+	inode->i_mtime = inode->i_atime = current_time(inode);
 	insert_inode_hash(inode);
 #ifndef TWOSIX
 	inode->i_generation = event++;
@@ -158,13 +158,13 @@ repeat:
 
 	mark_inode_dirty(inode);
 
-	unlock_super (sb);
+	// TODO unlock_super (sb);
 	//ods2_debug ("allocating inode %lu\n", inode->i_ino);
 	return inode;
 
 fail2:
 fail:
-	unlock_super(sb);
+	// TODO unlock_super(sb);
 	make_bad_inode(inode);
 	iput(inode);
 	return ERR_PTR(err);
@@ -177,7 +177,7 @@ bad_count:
 #endif
 	/* Is it really ENOSPC? */
 	err = -ENOSPC;
-	if (sb->s_flags & MS_RDONLY)
+	if (sb->s_flags & SB_RDONLY)
 		goto fail;
 
 	goto repeat;
@@ -207,7 +207,7 @@ unsigned bitmap_search(struct super_block * sb,unsigned *position,unsigned *coun
         WORK_UNIT *bitmap;
         WORK_UNIT *work_ptr, work_val;
         unsigned work_count;
-	bitmap = ods2p->sbh->b_data + ((long)(map_block-2)<<9);
+	bitmap = (void *) ods2p->sbh->b_data + ((long)(map_block-2)<<9);
 	blkcount=1;
         if ((sts & 1) == 0) return sts;
         work_ptr = bitmap + block_offset / WORK_BITS;
@@ -299,7 +299,7 @@ unsigned bitmap_modify(struct super_block * sb,unsigned cluster,unsigned count,
         WORK_UNIT *bitmap;
         WORK_UNIT *work_ptr;
         unsigned work_count;
-	bitmap = ods2p->sbh->b_data + ((long)(map_block-2)<<9);
+	bitmap = (void *) ods2p->sbh->b_data + ((long)(map_block-2)<<9);
 	blkcount=1;
         if (!(sts & 1)) return sts;
         work_ptr = bitmap + block_offset / WORK_BITS;

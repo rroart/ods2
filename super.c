@@ -33,6 +33,7 @@
 #include <linux/statfs.h>
 #include <linux/parser.h>
 #include <linux/version.h>
+#include <linux/mount.h>
 #endif
 
 #include "ods2.h"
@@ -70,10 +71,10 @@ int ods2_statfs(struct super_block *sb, struct statfs *buf) {
 	return 0;
 }
 #else
-int ods2_statfs(struct super_block *sb, struct kstatfs *buf) {
-	ODS2SB			   *ods2p = ODS2_SB (sb);
+int ods2_statfs(struct dentry * dentry, struct kstatfs *buf) {
+	// TODO ODS2SB			   *ods2p = ODS2_SB (sb);
 
-	memcpy(buf, &ods2p->statfs, sizeof(struct kstatfs));
+	//memcpy(buf, &ods2p->statfs, sizeof(struct kstatfs));
 	return 0;
 }
 #endif
@@ -99,10 +100,10 @@ static struct super_operations ods2_sops = {
 #if LINUX_VERSION_CODE < 0x2061A
 	.put_inode=	ods2_put_inode,
 #endif
-	.delete_inode=	ods2_delete_inode,
-	.clear_inode=	ods2_clear_inode,
+	// TODO .delete_inode=	ods2_delete_inode,
+	// TODO .clear_inode=	ods2_clear_inode,
 	.put_super=	ods2_put_super,
-	.write_super=	ods2_write_super,
+	// TODO .write_super=	ods2_write_super,
 	.statfs=		ods2_statfs,
 	//remount_fs=	NULL,
 };
@@ -232,7 +233,7 @@ int ods2_read_ibitmap(struct super_block *sb) {
 #ifndef TWOSIX
 static struct super_block * ods2_read_super(struct super_block *sb, void *data, int silent)
 #else
-static struct super_block * ods2_fill_super(struct super_block *sb, void *data, int silent)
+static int ods2_fill_super(struct super_block *sb, void *data, int silent)
 #endif
 {
 	struct buffer_head	   *bh;
@@ -256,7 +257,7 @@ static struct super_block * ods2_fill_super(struct super_block *sb, void *data, 
 		ods2p = ODS2_SB(sb);
 		//memcpy(&ods2p->hm2, GETBLKP(sb, 1, bh->b_data), sizeof(HM2DEF));
 		ods2p->bh = bh;
-		ods2p->hm2 = bh->b_data;
+		ods2p->hm2 = (void *) bh->b_data;
 		//brelse(bh);
 		
 		for (p = (u16 *)(ods2p->hm2) ; p < (u16 *)&(ods2p->hm2->hm2$w_checksum1) ; chksum1 += *p++);
@@ -296,7 +297,7 @@ static struct super_block * ods2_fill_super(struct super_block *sb, void *data, 
 #if LINUX_VERSION_CODE < 0x2061A
 			sb->s_root = d_alloc_root(iget(sb, 4)); /* this is 000000.DIR;1 */
 #else
-			sb->s_root = d_alloc_root(ods2_iget(sb, 4)); /* this is 000000.DIR;1 */
+			sb->s_root = d_make_root(ods2_iget(sb, 4)); /* this is 000000.DIR;1 */
 #endif
 			
 #ifndef TWOSIX
@@ -369,16 +370,16 @@ static void ods2_commit_super (struct super_block * sb,
 {
         //es->s_wtime = cpu_to_le32(CURRENT_TIME);
         mark_buffer_dirty(((struct ods2sb *)ODS2_SB(sb))->bh);
-        sb->s_dirt = 0;
+        // TODO sb->s_dirt = 0;
 }
 
 static void ods2_sync_super(struct super_block *sb, struct hm2def *es)
 {
         //es->s_wtime = cpu_to_le32(CURRENT_TIME);
         mark_buffer_dirty(((struct ods2sb *)ODS2_SB(sb))->bh);
-        ll_rw_block(WRITE, 1, &((struct ods2sb *)ODS2_SB(sb))->bh);
+        // TODO ll_rw_block(WRITE, 1, &((struct ods2sb *)ODS2_SB(sb))->bh);
         wait_on_buffer(((struct ods2sb *)ODS2_SB(sb))->bh);
-        sb->s_dirt = 0;
+        //sb->s_dirt = 0;
 }
 
 void ods2_write_super (struct super_block * sb)
@@ -386,6 +387,7 @@ void ods2_write_super (struct super_block * sb)
         struct hm2def * es;
 	struct ods2sb * osb = ODS2_SB(sb);
 
+	#define MS_RDONLY     1
         if (!(sb->s_flags & MS_RDONLY)) {
                 es = osb->hm2;
 
@@ -398,9 +400,9 @@ void ods2_write_super (struct super_block * sb)
                         ods2_sync_super(sb, es);
                 } else
 #endif
-                        ods2_commit_super (sb, es);
+                        ods2_commit_super (sb, 0);
         }
-        sb->s_dirt = 0;
+        //sb->s_dirt = 0;
 }
 
 #ifndef TWOSIX
@@ -416,10 +418,10 @@ static struct super_block *ods2_get_sb(struct file_system_type *fs_type,
         return get_sb_bdev(fs_type, flags, dev_name, data, ods2_fill_super);
 }
 #else
-static struct super_block *ods2_get_sb(struct file_system_type *fs_type,
-				       int flags, const char *dev_name, void *data, void * mnt)
+static  struct dentry * ods2_get_sb(struct file_system_type *fs_type,
+				       int flags, const char *dev_name, void *data)
 {
-        return get_sb_bdev(fs_type, flags, dev_name, data, ods2_fill_super, mnt);
+        return mount_bdev(fs_type, flags, dev_name, data, ods2_fill_super);
 }
 #endif
 
@@ -428,7 +430,7 @@ static struct file_system_type ods2_fs_type = {
 	.owner          = THIS_MODULE,
 #endif
 	.name           = "ods2",
-	.get_sb         = ods2_get_sb,
+	.mount          = ods2_get_sb,
 	.kill_sb        = kill_block_super,
 	.fs_flags       = FS_REQUIRES_DEV,
 };
@@ -445,7 +447,7 @@ static void __exit exit_ods2_fs(void)
 	unregister_filesystem(&ods2_fs_type);
 }
 
-EXPORT_NO_SYMBOLS;
+// TODO EXPORT_NO_SYMBOLS;
 
 module_init(init_ods2_fs);
 module_exit(exit_ods2_fs);
