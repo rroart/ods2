@@ -13,8 +13,6 @@ else
 obj-$(CONFIG_ODS2_FS) += ods2.o
 
 ods2-y    := super.o inode.o file.o dir.o util.o tparse.o bitmap.o
-
-EXTRA_CFLAGS  := $(EXTRA_CFLAGS) -DTWOSIX
 endif
 
 ifneq ($(KERNELRELEASE),)

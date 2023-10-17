@@ -2,26 +2,14 @@
 // Author. Roar Thronæs.
 
 #include <linux/version.h>
-#if LINUX_VERSION_CODE < 0x20612
-#include <linux/config.h>
-#endif
-#ifdef TWOSIX
 #include <linux/module.h>
-#endif
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/init.h>
-#ifndef TWOSIX
-#include <linux/locks.h>
-#endif
 #include <linux/blkdev.h>
-#ifndef TWOSIX
-#include <asm/uaccess.h>
-#else
 #include <linux/buffer_head.h>
-#endif
 
 #include "ods2.h"
 
@@ -56,7 +44,7 @@ repeat:
 	mark_buffer_dirty(bh);
 	if (sb->s_flags & SB_SYNCHRONOUS) {
 	  // TODO ll_rw_block (WRITE, 1, &bh);
-		wait_on_buffer (bh);
+	  sync_dirty_buffer(bh);
 	}
 
 	ino = i + 1;
@@ -81,11 +69,7 @@ repeat:
 	  *mp++ = (start_pos * ods2p->hm2->hm2$w_cluster) >> 16;
 	  head->fh2$b_map_inuse += 4;
 	  ODS2SB *ods2p = ODS2_SB(sb);
-#if LINUX_VERSION_CODE < 0x2061A
-	  ODS2FH *ods2fhp = (ODS2FH *)ods2p->indexf->u.generic_ip;
-#else
 	  ODS2FH *ods2fhp = (ODS2FH *)ods2p->indexf->i_private;
-#endif
 	  void * oldmap = ods2fhp->map;
 	  ods2fhp->map = getmap(sb, head); // fix addmap later
 	  kfree(oldmap);
@@ -100,43 +84,22 @@ repeat:
 
 	mark_buffer_dirty(ods2p->bh);
 	// TODO sb->s_dirt = 1;
-#if LINUX_VERSION_CODE < 0x2061F
-	inode->i_uid = current->fsuid;
-	inode->i_gid = current->fsgid;
-#else
 	inode->i_uid.val = 0;
 	inode->i_gid.val = 0;
-#endif
 	inode->i_mode = mode;
 
 	inode->i_ino = ino;
-#if LINUX_VERSION_CODE < 0x2061A
-	inode->i_blksize = PAGE_SIZE;	/* This is the optimal IO size (for stat), not the fs block size */
-#endif
 	inode->i_blocks = 0;
 	inode->i_mtime = inode->i_atime = current_time(inode);
 	insert_inode_hash(inode);
-#ifndef TWOSIX
-	inode->i_generation = event++;
-#else
 	inode->i_generation++; //suffices?
-#endif
-#if LINUX_VERSION_CODE < 0x2061A
-	inode->u.generic_ip = kmalloc(sizeof(ODS2FH), GFP_KERNEL);
-	memset(inode->u.generic_ip, 0, sizeof(ODS2FH));
-#else
 	inode->i_private = kmalloc(sizeof(ODS2FH), GFP_KERNEL);
 	memset(inode->i_private, 0, sizeof(ODS2FH));
-#endif
 	ODS2FH                 *ods2fhp;
 	FI2DEF                 *fi2p;
 	FATDEF                 *fatp;
 
-#if LINUX_VERSION_CODE < 0x2061A
-	ods2fhp = (ODS2FH *)inode->u.generic_ip;
-#else
 	ods2fhp = (ODS2FH *)inode->i_private;
-#endif
 	ods2fhp->map = kmalloc(sizeof(ODS2MAP),GFP_KERNEL);
 	memset(ods2fhp->map, 0, sizeof(ODS2MAP));
 	ods2fhp->ods2vari = NULL;
@@ -150,11 +113,6 @@ repeat:
 	fatp->fat$l_efblk=VMSSWAP((1));
 	fatp->fat$w_ffbyte=0;
 
-#ifdef TWOSIX
-#if LINUX_VERSION_CODE < 0x20612
-	inode->i_bdev=sb->s_bdev;
-#endif
-#endif
 
 	mark_inode_dirty(inode);
 

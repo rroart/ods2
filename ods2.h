@@ -11,9 +11,7 @@
  *
  */
 
-#ifdef TWOSIX
 #include <linux/statfs.h>
-#endif
 
 /*
   The followinf structures are defined in the book
@@ -459,11 +457,7 @@ typedef struct ods2fh {
 #define SB$M_RAW	   8
 #define SB$M_LOWERCASE	   16
 
-#ifdef TWOSIX
 #define ODS2_SB(sb) (sb->s_fs_info)
-#else
-#define ODS2_SB(sb) ((struct ods2sb *)(sb->u.generic_sbp))
-#endif
 #define VMSSWAP(l) ((l & 0xffff) << 16 | l >> 16)
 #define FAT$C_SEQUENTIAL FAT$C_SEQUANTIAL
 #define fat$l_hiblk u1.fat$l_hiblk
@@ -521,11 +515,7 @@ typedef struct ods2sb {
 	struct inode		 *indexf;  /* INDEXF.SYS */
 	u8			 *ibitmap; /* index file header bitmap */
 	struct buffer_head * sbh;
-#ifndef TWOSIX
-	struct statfs		  statfs;
-#else
 	struct kstatfs            statfs;
-#endif
 	struct {
 		int		  v_version:3; /* what to do with file versions */
 		int		  v_raw:1;     /* force all files as stream */
@@ -587,11 +577,7 @@ char * my_strstr (const char *, const char *);
 */
 
 struct dentry *ods2_lookup(struct inode *dir, struct dentry *dentry, unsigned int flags);
-#if LINUX_VERSION_CODE < 0x2061A
-void ods2_read_inode(struct inode *inode);
-#else
 struct inode * ods2_iget(struct super_block *, unsigned long);
-#endif
 void ods2_put_inode(struct inode *inode);
 void ods2_clear_inode(struct inode *inode);
 void ods2_delete_inode(struct inode *inode);

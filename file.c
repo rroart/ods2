@@ -15,25 +15,13 @@
  */
 
 #include <linux/version.h>
-#if LINUX_VERSION_CODE < 0x20612
-#include <linux/config.h>
-#endif
-#ifdef TWOSIX
 #include <linux/module.h>
-#endif
 #include <linux/string.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/init.h>
-#ifndef TWOSIX
-#include <linux/locks.h>
-#endif
 #include <linux/blkdev.h>
-#ifndef TWOSIX
-#include <asm/uaccess.h>
-#else
 #include <linux/buffer_head.h>
-#endif
 
 #include "ods2.h"
 
@@ -197,11 +185,7 @@ int update_virtual_file_pos(loff_t loff, ODS2VARI *ods2vari, u64 currec) {
 ssize_t ods2_read_variable(struct file *filp, char *buf, size_t buflen, loff_t *loff) {
 	struct inode		   *inode = filp->f_inode;
 	char			   *buforg = buf;
-#if LINUX_VERSION_CODE < 0x2061A
-	ODS2FH			   *ods2fhp = (ODS2FH *)inode->u.generic_ip;
-#else
 	ODS2FH			   *ods2fhp = (ODS2FH *)inode->i_private;
-#endif
 	ODS2FILE		   *ods2filep = (ODS2FILE *)filp->private_data;
 	ODS2VARI		   *ods2vari = ods2fhp->ods2vari;
 	FATDEF			   *fatp = (FATDEF *)&(ods2fhp->fat);
@@ -394,11 +378,7 @@ ssize_t ods2_read(struct file *filp, char *buf, size_t buflen, loff_t *loff) {
 	struct inode		   *inode = filp->f_inode;
 	struct super_block	   *sb = inode->i_sb;
 	ODS2SB			   *ods2p = ODS2_SB(sb);
-#if LINUX_VERSION_CODE < 0x2061A
-	ODS2FH			   *ods2fhp = (ODS2FH *)inode->u.generic_ip;
-#else
 	ODS2FH			   *ods2fhp = (ODS2FH *)inode->i_private;
-#endif
 	ODS2FILE		   *ods2filep = (ODS2FILE *)filp->private_data;
 	FATDEF			   *fatp = (FATDEF *)&(ods2fhp->fat);
 	
@@ -470,10 +450,6 @@ loff_t ods2_llseek_stream(struct file *filp, loff_t loff, int seek) {
 		}
 	}
 	filp->f_pos = offs;
-#ifndef TWOSIX
-// check this?
-	filp->f_reada = 0;
-#endif
 	filp->f_version++;
 	return offs;
 }
@@ -532,11 +508,7 @@ loff_t ods2_llseek_stream(struct file *filp, loff_t loff, int seek) {
 loff_t ods2_llseek_variable(struct file *filp, loff_t loff, int seek) {
 	struct inode		   *inode = filp->f_inode;
 	ODS2VAR			   *ods2varp = NULL;
-#if LINUX_VERSION_CODE < 0x2061A
-	ODS2FH			   *ods2fhp = (ODS2FH *)inode->u.generic_ip;
-#else
 	ODS2FH			   *ods2fhp = (ODS2FH *)inode->i_private;
-#endif
 	ODS2VARI		   *ods2vari = ods2fhp->ods2vari;
 	ODS2FILE		   *ods2filep = (ODS2FILE *)filp->private_data;
 	FATDEF			   *fatp = (FATDEF *)&(ods2fhp->fat);
@@ -598,10 +570,6 @@ loff_t ods2_llseek_variable(struct file *filp, loff_t loff, int seek) {
 				ods2filep->reclen = 65535;
 				up(&(ods2vari->sem));
 				filp->f_pos = coffs;
-#ifndef TWOSIX
-// check this?
-				filp->f_reada = 0;
-#endif
 				filp->f_version++;
 				return offs;
 			}
@@ -615,10 +583,6 @@ loff_t ods2_llseek_variable(struct file *filp, loff_t loff, int seek) {
 				ods2filep->reclen = 65535;
 				up(&(ods2vari->sem));
 				filp->f_pos = coffs;
-#ifndef TWOSIX
-// check this?
-				filp->f_reada = 0;
-#endif
 				filp->f_version++;
 				return offs;
 			}
@@ -633,10 +597,6 @@ loff_t ods2_llseek_variable(struct file *filp, loff_t loff, int seek) {
 			ods2filep->reclen = reclen;
 			up(&(ods2vari->sem));
 			filp->f_pos = coffs;
-#ifndef TWOSIX
-// check this?
-			filp->f_reada = 0;
-#endif
 			filp->f_version++;
 			return offs;
 		}
@@ -653,11 +613,7 @@ loff_t ods2_llseek(struct file *filp, loff_t loff, int seek) {
 	struct inode		   *inode = filp->f_inode;
 	struct super_block	   *sb = inode->i_sb;
 	ODS2SB			   *ods2p = ODS2_SB(sb);
-#if LINUX_VERSION_CODE < 0x2061A
-	ODS2FH			   *ods2fhp = (ODS2FH *)inode->u.generic_ip;
-#else
 	ODS2FH			   *ods2fhp = (ODS2FH *)inode->i_private;
-#endif
 	ODS2FILE		   *ods2filep = (ODS2FILE *)filp->private_data;
 	FATDEF			   *fatp = (FATDEF *)&(ods2fhp->fat);
 

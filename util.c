@@ -12,25 +12,13 @@
  */
 
 #include <linux/version.h>
-#if LINUX_VERSION_CODE < 0x20612
-#include <linux/config.h>
-#endif
-#ifdef TWOSIX
 #include <linux/module.h>
-#endif
 #include <linux/string.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/init.h>
-#ifndef TWOSIX
-#include <linux/locks.h>
-#endif
 #include <linux/blkdev.h>
-#ifndef TWOSIX
-#include <asm/uaccess.h>
-#else
 #include <linux/buffer_head.h>
-#endif
 
 #include "ods2.h"
 #include "tparse.h"
@@ -75,11 +63,7 @@ u32 ino2fhlbn(struct super_block *sb, u32 ino) {
 	if (ino < 17) { /* the first 16 file headers are located at known locations in INDEXF.SYS */
 		return le16_to_cpu(ods2p->hm2->hm2$w_ibmapsize) + le32_to_cpu(ods2p->hm2->hm2$l_ibmaplbn) + ino - 1;
 	} else {
-#if LINUX_VERSION_CODE < 0x2061A
-		ODS2FH		   *ods2fhp = (ODS2FH *)ods2p->indexf->u.generic_ip;
-#else
 		ODS2FH		   *ods2fhp = (ODS2FH *)ods2p->indexf->i_private;
-#endif
 		
 		return vbn2lbn(sb, ods2fhp->map, le16_to_cpu(ods2p->hm2->hm2$w_cluster) * 4 + le16_to_cpu(ods2p->hm2->hm2$w_ibmapsize) + ino);
 	}
@@ -171,11 +155,7 @@ ODS2MAP *getmap(struct super_block *sb, FH2DEF *fh2p) {
 struct buffer_head *getfilebh(struct file *filp,  u32 vbn) {
 	struct inode		   *inode = filp->f_inode;
 	struct super_block	   *sb = inode->i_sb;
-#if LINUX_VERSION_CODE < 0x2061A
-	ODS2FH			   *ods2fhp = (ODS2FH *)inode->u.generic_ip;
-#else
 	ODS2FH			   *ods2fhp = (ODS2FH *)inode->i_private;
-#endif
 	ODS2FILE		   *ods2filep = (ODS2FILE *)filp->private_data;
 	
 

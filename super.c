@@ -12,31 +12,21 @@
  */
 
 #include <linux/version.h>
-#if LINUX_VERSION_CODE < 0x20612
-#include <linux/config.h>
-#endif
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/fs.h>
-#ifdef TWOSIX
 #include <linux/buffer_head.h>
-#endif
 #include <linux/slab.h>
 #include <linux/init.h>
-#ifndef TWOSIX
-#include <linux/locks.h>
-#endif
 #include <linux/blkdev.h>
-#ifndef TWOSIX
-#include <asm/uaccess.h>
-#else
 #include <linux/statfs.h>
 #include <linux/parser.h>
 #include <linux/version.h>
 #include <linux/mount.h>
-#endif
 
 #include "ods2.h"
+
+static int ods2_sync_fs(struct super_block *sb, int wait);
 
 /*
   This routine is executed when the ODS2 file system is unmounted.
@@ -63,51 +53,50 @@ static void ods2_put_super(struct super_block *sb) {
   the information we were gathering during the mount into the buffer.
 */
 
-#ifndef TWOSIX
-int ods2_statfs(struct super_block *sb, struct statfs *buf) {
-	ODS2SB			   *ods2p = ODS2_SB (sb);
-
-	memcpy(buf, &ods2p->statfs, sizeof(struct statfs));
-	return 0;
-}
-#else
 int ods2_statfs(struct dentry * dentry, struct kstatfs *buf) {
 	// TODO ODS2SB			   *ods2p = ODS2_SB (sb);
 
 	//memcpy(buf, &ods2p->statfs, sizeof(struct kstatfs));
 	return 0;
 }
-#endif
 
-#ifndef TWOSIX
+static int ods2_sync_fs(struct super_block *sb, int wait)
+{
+	// TODO
+	/*
+        struct ext2_sb_info *sbi = EXT2_SB(sb);
+        struct ext2_super_block *es = EXT2_SB(sb)->s_es;
+	*/
+
+        /*                                                                      
+         * Write quota structures to quota file, sync_blockdev() will write     
+         * them to disk later                                                   
+         */
+
+	/*
+        dquot_writeback_dquots(sb, -1);
+
+        spin_lock(&sbi->s_lock);
+        if (es->s_state & cpu_to_le16(EXT2_VALID_FS)) {
+                ext2_debug("setting valid to 0\n");
+                es->s_state &= cpu_to_le16(~EXT2_VALID_FS);
+        }
+        spin_unlock(&sbi->s_lock);
+        ext2_sync_super(sb, es, wait);
+	*/
+        return 0;
+}
+
 static struct super_operations ods2_sops = {
-	read_inode:	ods2_read_inode,
-	write_inode:	ods2_write_inode,
-	put_inode:	ods2_put_inode,
-	delete_inode:	ods2_delete_inode,
-	clear_inode:	ods2_clear_inode,
-	put_super:	ods2_put_super,
-	write_super:	ods2_write_super,
-	statfs:		ods2_statfs,
-	remount_fs:	NULL,
-};
-#else
-static struct super_operations ods2_sops = {
-#if LINUX_VERSION_CODE < 0x2061A
-	.read_inode=	ods2_read_inode,
-#endif
 	.write_inode=	ods2_write_inode,
-#if LINUX_VERSION_CODE < 0x2061A
-	.put_inode=	ods2_put_inode,
-#endif
 	// TODO .delete_inode=	ods2_delete_inode,
 	// TODO .clear_inode=	ods2_clear_inode,
 	.put_super=	ods2_put_super,
 	// TODO .write_super=	ods2_write_super,
 	.statfs=		ods2_statfs,
 	//remount_fs=	NULL,
+	.sync_fs        = ods2_sync_fs,
 };
-#endif
 
 /*
   This array is used to get the number of bits set for a nibble value.
@@ -124,16 +113,8 @@ int ods2_read_bitmap(struct super_block *sb) {
 	struct buffer_head	   *bh;
 	struct inode		   *inode;
 	
-#if LINUX_VERSION_CODE < 0x2061A
-	if ((inode = iget(sb, 2)) != NULL) { /* this is BITMAP.SYS */
-#else
 	if ((inode = ods2_iget(sb, 2)) != NULL) { /* this is BITMAP.SYS */
-#endif
-#if LINUX_VERSION_CODE < 0x20614
-		ODS2FH			 *ods2fhp = (ODS2FH *)(inode->u.generic_ip);
-#else
 		ODS2FH			 *ods2fhp = (ODS2FH *)(inode->i_private);
-#endif
 		u32			  lbn;
 
 		if ((lbn = vbn2lbn(sb, ods2fhp->map, 1)) > 0 &&
@@ -178,11 +159,7 @@ int ods2_read_bitmap(struct super_block *sb) {
 				brelse(bh);
 				iput(inode);
 				lbn = vbn2lbn(sb, ods2fhp->map, 2);
-#ifndef TWOSIX
-				ods2p->sbh = bread(sb->s_dev, lbn, (scb->scb$l_volsize/(512*8*scb->scb$w_cluster)+1)<<9);
-#else
 				ods2p->sbh = __bread(sb->s_bdev, lbn, (scb->scb$l_volsize/(512*8*scb->scb$w_cluster)+1)<<9);
-#endif
 				return 1; /* everything went ok */
 			}
 			brelse(bh); /* invalid data in VBN 1 */
@@ -230,20 +207,12 @@ int ods2_read_ibitmap(struct super_block *sb) {
   is mounted.
 */
 
-#ifndef TWOSIX
-static struct super_block * ods2_read_super(struct super_block *sb, void *data, int silent)
-#else
 static int ods2_fill_super(struct super_block *sb, void *data, int silent)
-#endif
 {
 	struct buffer_head	   *bh;
 	ODS2SB			   *ods2p;
 
-#ifndef TWOSIX
-	sb_set_blocksize(sb, get_hardsect_size(sb->s_dev));
-#else
 	sb_min_blocksize(sb, 512);
-#endif
 	if ((bh = sb_bread(sb, GETBLKNO(sb, 1))) != NULL && bh->b_data != NULL) {
 
 		u16     	   *p;
@@ -284,27 +253,11 @@ static int ods2_fill_super(struct super_block *sb, void *data, int silent)
 
 			sb->s_op = &ods2_sops;
 
-#if LINUX_VERSION_CODE < 0x2061A
-			ods2p->indexf = iget(sb, 1); /* read INDEXF.SYS. */
-#else
 			ods2p->indexf = ods2_iget(sb, 1); /* read INDEXF.SYS. */
-#endif
 
-#if 0
-			extend_map(((ODS2FH *)ods2p->indexf->u.generic_ip)->map); // gross hack
-#endif
-			
-#if LINUX_VERSION_CODE < 0x2061A
-			sb->s_root = d_alloc_root(iget(sb, 4)); /* this is 000000.DIR;1 */
-#else
 			sb->s_root = d_make_root(ods2_iget(sb, 4)); /* this is 000000.DIR;1 */
-#endif
 			
-#ifndef TWOSIX
-			ods2p->ibh = bread(sb->s_dev, ods2p->hm2->hm2$l_ibmaplbn, ods2p->hm2->hm2$w_ibmapsize << 9);;
-#else
 			ods2p->ibh = __bread(sb->s_bdev, ods2p->hm2->hm2$l_ibmaplbn, ods2p->hm2->hm2$w_ibmapsize << 9);;
-#endif
 
 			/*
 			  We need to be able to read the index file header bitmap.
@@ -341,11 +294,7 @@ static int ods2_fill_super(struct super_block *sb, void *data, int silent)
 					memcpy(volowner, ods2p->hm2->hm2$t_ownername, 12);
 					volowner[12] = 0;
 					printk("ODS2-fs This is a valid ODS2 file system with format /%s/ and volume name /%s/ and owner /%s/\n", format, volname, volowner);
-#ifndef TWOSIX
-					return sb;
-#else
 					return 0;
-#endif
 				}
 #if 0
 // not yet
@@ -358,11 +307,7 @@ static int ods2_fill_super(struct super_block *sb, void *data, int silent)
 		kfree(ODS2_SB(sb));
 #endif
 	}
-#ifndef TWOSIX
-	return NULL;
-#else
 	return -EINVAL;
-#endif
 }
 
 static void ods2_commit_super (struct super_block * sb,
@@ -403,30 +348,18 @@ void ods2_write_super (struct super_block * sb)
                         ods2_commit_super (sb, 0);
         }
         //sb->s_dirt = 0;
+	if (!sb_rdonly(sb))
+                ods2_sync_fs(sb, 1);
 }
 
-#ifndef TWOSIX
-static DECLARE_FSTYPE_DEV(ods2_fs_type, "ods2", ods2_read_super);
-#else
-#ifndef LINUX_VERSION_CODE
-#error
-#endif
-#if LINUX_VERSION_CODE < 0x20612
-static struct super_block *ods2_get_sb(struct file_system_type *fs_type,
-				       int flags, const char *dev_name, void *data)
-{
-        return get_sb_bdev(fs_type, flags, dev_name, data, ods2_fill_super);
-}
-#else
 static  struct dentry * ods2_get_sb(struct file_system_type *fs_type,
 				       int flags, const char *dev_name, void *data)
 {
         return mount_bdev(fs_type, flags, dev_name, data, ods2_fill_super);
 }
-#endif
 
 static struct file_system_type ods2_fs_type = {
-#if 0
+#if 1
 	.owner          = THIS_MODULE,
 #endif
 	.name           = "ods2",
@@ -434,7 +367,6 @@ static struct file_system_type ods2_fs_type = {
 	.kill_sb        = kill_block_super,
 	.fs_flags       = FS_REQUIRES_DEV,
 };
-#endif
 
 static int __init init_ods2_fs(void)
 {
