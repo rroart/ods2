@@ -1,5 +1,7 @@
 For 5/6:
 make -C /lib/modules/`uname -r`/build M=$PWD
+insmod -f ods2.ko
+reboot each time
 
 For 2.6:
 
