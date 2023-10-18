@@ -45,6 +45,7 @@ int ods2_readdir(struct file *filp, struct dir_context *dirent) {
 	char			    cdirname[256];
 
 	memset(cdirname, ' ', sizeof(cdirname));
+	printk("k %x\n", pos);
 	/*
 	  When there are no more files to return the file position in file
 	  is set to -1.
@@ -58,16 +59,15 @@ int ods2_readdir(struct file *filp, struct dir_context *dirent) {
 	  . for the current directory and .. for the parent directory.
 	*/
 
-	/*
-	  TODO
 	if (pos == 0) {
-		filldir(dirent, ".", 1, 0, inode->i_ino, DT_DIR);
-		filldir(dirent, "..", 2, 1, ods2fhp->parent, DT_DIR);
+		dir_emit_dot(filp, dirent);
+		dirent->pos++;
+		dir_emit_dotdot(filp, dirent);
+		dirent->pos++;
 		ods2filep->currec = 0;
 		ods2filep->curbyte = 0;
 		vbn = 0;
 	}
-	*/
 	
 	/*
 	  As long we can translate the virtual block number, VBN, to a
@@ -94,6 +94,7 @@ int ods2_readdir(struct file *filp, struct dir_context *dirent) {
 			
 			memcpy(dirname, &dire->u1.s1.dir$t_name, dire->u1.s1.dir$b_namecount);
 			dirname[dire->u1.s1.dir$b_namecount] = 0;
+			printk("k %s\n", dirname);
 			if (ods2p->dollar != '$' || ods2p->flags.v_lowercase) {
 				char	       *p = dirname;
 				char		cnt = dire->u1.s1.dir$b_namecount;
@@ -125,15 +126,15 @@ int ods2_readdir(struct file *filp, struct dir_context *dirent) {
 					  the false directory.
 					*/
 
-						/*
-						  We come here when filldir is unable to handle more entries.
-					if (filldir(dirent, dirnamev, strlen(dirnamev), filp->f_pos, ino, 
+					if (!dir_emit(dirent, dirnamev, strlen(dirnamev), ino, 
 						    (my_strstr(dirnamev, (ods2p->flags.v_lowercase ? ".dir." : ".DIR")) == NULL ? DT_REG : DT_DIR))) {
 
+						/*
+						  We come here when filldir is unable to handle more entries.
+						*/
 						brelse(bh);
 						return 0;
 					}
-						*/
 					if (ods2p->flags.v_version != SB$M_VERSALL) { strcpy(cdirname, dirname); }
 				}
 				if (ods2p->flags.v_version == SB$M_VERSALL) {
@@ -164,6 +165,7 @@ int ods2_readdir(struct file *filp, struct dir_context *dirent) {
 		brelse(bh);
 		vbn++;
 		ods2filep->currec = vbn * 512;
+		break; // TODO infinite loop
 	}
 	filp->f_pos = -1; /* this mark that we have no more files to return */
 	return 0;

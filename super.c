@@ -35,16 +35,7 @@ static int ods2_sync_fs(struct super_block *sb, int wait);
 */
 
 static void ods2_put_super(struct super_block *sb) {
-	ODS2SB			   *ods2p = ODS2_SB (sb);
-	
-	if (ods2p != NULL) {
-		iput(ods2p->indexf); /* release INDEXF.SYS;1 */
-#if 0
-// not yet
-		kfree(ods2p->ibitmap);
-		kfree(ODS2_SB(sb));
-#endif
-	}
+	kfree(sb->s_fs_info);
 }
 
 /*
@@ -87,15 +78,30 @@ static int ods2_sync_fs(struct super_block *sb, int wait)
         return 0;
 }
 
+static void ods2_evict_inode (struct inode *inode) {
+        void * fh = inode->i_private;
+	if (!fh)
+		return;
+	kfree (fh);
+	clear_inode(inode);	
+}
+
+static int ods2_remount_fs (struct super_block *sb, int *flags, char *data)  {
+	// TODO
+	return 0;
+}
+
 static struct super_operations ods2_sops = {
 	.write_inode=	ods2_write_inode,
+	.evict_inode=	ods2_evict_inode,
+	.put_super=	ods2_put_super,
+	.sync_fs        = ods2_sync_fs,
+	.statfs=		ods2_statfs,
+	.remount_fs=		ods2_remount_fs,
 	// TODO .delete_inode=	ods2_delete_inode,
 	// TODO .clear_inode=	ods2_clear_inode,
-	.put_super=	ods2_put_super,
 	// TODO .write_super=	ods2_write_super,
-	.statfs=		ods2_statfs,
 	//remount_fs=	NULL,
-	.sync_fs        = ods2_sync_fs,
 };
 
 /*

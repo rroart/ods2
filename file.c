@@ -25,6 +25,8 @@
 
 #include "ods2.h"
 
+ssize_t ods2_read(struct file *filp, char *buf, size_t buflen, loff_t *loff);
+
 /*
   FUNCTION:
 

@@ -37,8 +37,8 @@ struct file_operations ods2_dir_operations = {
 };
 
 struct file_operations ods2_file_operations = {
-//	read=		ods2_read,
-	read:           NULL, // TODO do_sync_read,
+        read:		ods2_read,
+	//read:           NULL, // TODO do_sync_read,
 	write:          NULL, // TODO do_sync_write,
         //aio_read:       generic_file_aio_read,
         //aio_write:      generic_file_aio_write,
